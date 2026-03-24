@@ -2,10 +2,15 @@ import torch
 from ultralytics import YOLO
 import cv2
 import numpy as np
+import embedding_utils
 from boxmot import OcSort
 import time
 
+embedder = embedding_utils.EmbeddingGenerator()
+
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+c042_cross_line = [(773, 175), (953, 256)]
 
 def run():
     model = YOLO("yolo11m.pt")
@@ -61,6 +66,8 @@ def run():
                 cv2.putText(frame, f"ID {track_id}", (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             cv2.putText(frame, f"Frame {frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            if window_names[i] == "c042":
+                cv2.line(frame, c042_cross_line[0], c042_cross_line[1], (0, 0, 255), 2)
             cv2.imshow(window_names[i], frame)
 
         if paused:
