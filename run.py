@@ -9,17 +9,17 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def run():
     model = YOLO("yolo11m.pt")
     video_paths = [
-        r"AICity22_Track1_MTMC_Tracking\test\S06\c041/vdo.avi",
-        r"AICity22_Track1_MTMC_Tracking\test\S06\c042/vdo.avi",
+        r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
+        r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
     ]
+    window_names = ['c041', 'c042']
+    for window_name in window_names:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+
     caps = [cv2.VideoCapture(video_path) for video_path in video_paths]
 
     trackers = [OcSort() for _ in video_paths]
-    window_names = [f"Video {i}" for i in range(len(video_paths))]
 
-    for window_name in window_names:
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window_name, 640, 360)
 
     while True:
         rets_and_frames = [cap.read() for cap in caps]
@@ -62,8 +62,7 @@ def run():
                     2,
                 )
 
-            display_frame = cv2.resize(frame, (640, 360))
-            cv2.imshow(window_names[i], display_frame)
+            cv2.imshow(window_names[i], frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
