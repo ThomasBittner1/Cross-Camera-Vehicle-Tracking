@@ -17,6 +17,10 @@ def run():
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     caps = [cv2.VideoCapture(video_path) for video_path in video_paths]
+    fps_values = [cap.get(cv2.CAP_PROP_FPS) for cap in caps]
+    fps = next((v for v in fps_values if v and v > 0), 30.0)
+    delay_ms = max(1, int(round(1000.0 / fps)))
+    paused = False
 
     trackers = [OcSort() for _ in video_paths]
 
@@ -64,8 +68,15 @@ def run():
 
             cv2.imshow(window_names[i], frame)
 
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        if paused:
+            key = cv2.waitKey(0) & 0xFF
+        else:
+            key = cv2.waitKey(delay_ms) & 0xFF
+
+        if key == ord("q"):
             break
+        if key == ord(" "):
+            paused = not paused
 
     for cap in caps:
         cap.release()
