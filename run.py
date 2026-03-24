@@ -23,6 +23,7 @@ def run():
     paused = False
 
     trackers = [OcSort() for _ in video_paths]
+    frame_index = 0
 
 
     while True:
@@ -67,6 +68,15 @@ def run():
                     2,
                 )
 
+            cv2.putText(
+                frame,
+                f"Frame {frame_index}",
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 255, 255),
+                2,
+            )
             cv2.imshow(window_names[i], frame)
 
         if paused:
@@ -80,6 +90,9 @@ def run():
             break
         if key == ord(" "):
             paused = not paused
+
+        if not paused:
+            frame_index += 1
 
     for cap in caps:
         cap.release()
