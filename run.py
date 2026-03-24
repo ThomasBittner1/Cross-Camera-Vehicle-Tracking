@@ -18,8 +18,7 @@ def run():
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     caps = [cv2.VideoCapture(video_path) for video_path in video_paths]
-    fps_values = [cap.get(cv2.CAP_PROP_FPS) for cap in caps]
-    fps = next((v for v in fps_values if v and v > 0), 30.0)
+    fps = caps[0].get(cv2.CAP_PROP_FPS) or 10.0
     delay_ms = max(1, int(round(1000.0 / fps)))
     paused = False
 
