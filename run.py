@@ -3,6 +3,7 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 from boxmot import OcSort
+import time
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -26,6 +27,7 @@ def run():
 
 
     while True:
+        loop_start = time.perf_counter()
         rets_and_frames = [cap.read() for cap in caps]
         rets = [ret for ret, _ in rets_and_frames]
         frames = [frame for _, frame in rets_and_frames]
@@ -71,7 +73,9 @@ def run():
         if paused:
             key = cv2.waitKey(0) & 0xFF
         else:
-            key = cv2.waitKey(delay_ms) & 0xFF
+            elapsed_ms = int(round((time.perf_counter() - loop_start) * 1000.0))
+            wait_ms = max(1, delay_ms - elapsed_ms)
+            key = cv2.waitKey(wait_ms) & 0xFF
 
         if key == ord("q"):
             break
