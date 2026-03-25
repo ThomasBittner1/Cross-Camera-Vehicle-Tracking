@@ -12,6 +12,11 @@ embedder = embedding_utils.EmbeddingGenerator()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 c042_cross_line = [(773, 175), (953, 256)]
+# masks are created with draw_mask.py
+mask_c042 = [(1, 341), (379, 153), (661, 81), (889, 81), (1050, 190), (946, 279), (1279, 460), (1276, 957), (2, 957)]
+mask_c041 = [(1, 236), (132, 191), (462, 98), (587, 87), (829, 78), (986, 90), (1124, 111), (1228, 189), (1091, 279), (1277, 421), (1276, 956), (4, 958)]
+
+
 
 def run():
     model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt")
@@ -34,23 +39,28 @@ def run():
     frame_index = 0
     prev_centers = [dict() for _ in video_paths]
     crossed_ids = [set() for _ in video_paths]
-
+    masks = []
+    for pts in [mask_c041, mask_c042]:
+        mask = np.zeros(frame.shape, dtype=np.uint8)
+        pts = np.array(pts, dtype=np.int32)
+        cv2.fillPoly(mask, [pts], (255, 255, 255))
+        masks.append(mask)
 
     while True:
         loop_start = time.perf_counter()
         rets_and_frames = [cap.read() for cap in caps]
         rets = [ret for ret, _ in rets_and_frames]
         frames = [frame for _, frame in rets_and_frames]
+        masked_frames = frames #[cv2.bitwise_and(frame, mask) for frame in frames]
 
+        frames = masked_frames
         if not all(rets):
             break
 
         results = model.predict(
-            source=frames,
+            source=masked_frames,
             verbose=False,
-            # classes=[2, 3, 5, 7],
-            # classes=[1],
-            conf=0.25
+            conf=0.5
         )
 
         for i, (frame, result, tracker) in enumerate(zip(frames, results, trackers)):
