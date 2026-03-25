@@ -3,6 +3,7 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import embedding_utils
+import geometry_utils
 from boxmot import OcSort
 import time
 
@@ -13,7 +14,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 c042_cross_line = [(773, 175), (953, 256)]
 
 def run():
-    model = YOLO("yolo11m.pt")
+    model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt")
+    # model = YOLO("yolo11m.pt")
+
     video_paths = [
         r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
         r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
@@ -29,6 +32,8 @@ def run():
 
     trackers = [OcSort() for _ in video_paths]
     frame_index = 0
+    prev_centers = [dict() for _ in video_paths]
+    crossed_ids = [set() for _ in video_paths]
 
 
     while True:
@@ -43,7 +48,8 @@ def run():
         results = model.predict(
             source=frames,
             verbose=False,
-            classes=[2, 3, 5, 7],
+            # classes=[2, 3, 5, 7],
+            # classes=[1],
             conf=0.25
         )
 
@@ -63,7 +69,18 @@ def run():
                 track_id = int(track[4])
 
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, f"ID {track_id}", (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                label = f"ID {track_id}"
+                if window_names[i] == "c042":
+                    cx = int((x1 + x2) / 2)
+                    cy = int((y1 + y2) / 2)
+                    prev = prev_centers[i].get(track_id)
+                    if prev and track_id not in crossed_ids[i]:
+                        if geometry_utils.segments_intersect(prev, (cx, cy), c042_cross_line[0], c042_cross_line[1]):
+                            crossed_ids[i].add(track_id)
+                    prev_centers[i][track_id] = (cx, cy)
+                    if track_id in crossed_ids[i]:
+                        label = f"{label} crossed"
+                cv2.putText(frame, label, (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             cv2.putText(frame, f"Frame {frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
             if window_names[i] == "c042":

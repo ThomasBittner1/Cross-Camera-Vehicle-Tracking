@@ -92,4 +92,10 @@ class TrajectoryManager:
 
 
 
+def counter_clock_wise(a, b, c):
+    return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
+
+def segments_intersect(p1, p2, q1, q2):
+    return counter_clock_wise(p1, q1, q2) != counter_clock_wise(p2, q1, q2) and \
+        counter_clock_wise(p1, p2, q1) != counter_clock_wise(p1, p2, q2)
 
