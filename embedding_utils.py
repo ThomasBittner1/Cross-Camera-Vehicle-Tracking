@@ -7,6 +7,47 @@ import cv2
 import numpy as np
 
 
+def l2_normalize(x, axis=1, eps=1e-10):
+    x = np.asarray(x, dtype=np.float32)
+    norms = np.linalg.norm(x, axis=axis, keepdims=True)
+    return x / (norms + eps)
+
+
+def cosine_similarity(query, gallery):
+    query = np.asarray(query, dtype=np.float32)
+    gallery = np.asarray(gallery, dtype=np.float32)
+
+    if query.ndim == 1:
+        query = query[None, :]
+    if gallery.ndim == 1:
+        gallery = gallery[None, :]
+
+    query = l2_normalize(query)
+    gallery = l2_normalize(gallery)
+
+    return query @ gallery.T
+
+
+def cosine_distance(query, gallery):
+    return 1.0 - cosine_similarity(query, gallery)
+
+
+def find_closest_embedding(query, gallery):
+    gallery = np.asarray(gallery, dtype=np.float32)
+    if gallery.ndim == 1:
+        gallery = gallery[None, :]
+    if len(gallery) == 0:
+        return None, None
+
+    scores = cosine_similarity(query, gallery)
+    if scores.ndim == 2:
+        scores = scores[0]
+
+    best_idx = int(np.argmax(scores))
+    best_score = float(scores[best_idx])
+    return best_idx, best_score
+
+
 class EmbeddingGenerator:
     def __init__(self):
         # 1. Setup Device (Gaming Laptop GPU)
@@ -62,3 +103,19 @@ class EmbeddingGenerator:
         # Flatten and return as a numpy array
         # Shape: [N, 2048]
         return embeddings.view(embeddings.size(0), -1).cpu().numpy()
+
+    @staticmethod
+    def normalize_embeddings(embeddings):
+        return l2_normalize(embeddings)
+
+    @staticmethod
+    def compare_embeddings(query, gallery):
+        return cosine_similarity(query, gallery)
+
+    @staticmethod
+    def compare_embedding_distance(query, gallery):
+        return cosine_distance(query, gallery)
+
+    @staticmethod
+    def find_closest(query, gallery):
+        return find_closest_embedding(query, gallery)

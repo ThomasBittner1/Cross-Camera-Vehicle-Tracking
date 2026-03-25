@@ -15,11 +15,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 c042_cross_line = [(773, 175), (953, 256)]
 c041_cross_line = [(260, 331), (802, 906)]
 # masks are created with draw_mask.py
-mask_c042 = [(1, 341), (379, 153), (661, 81), (889, 81), (1050, 190), (946, 279), (1279, 460), (1276, 957), (2, 957)]
-mask_c041 = [(1, 236), (132, 191), (462, 98), (587, 87), (829, 78), (986, 90), (1124, 111), (1228, 189), (1091, 279), (1277, 421), (1276, 956), (4, 958)]
 
+mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
+mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
 
-def calculate_embedding(crops):
+def calculate_embedding_exited_car(crops):
     distributed_crops = geometry_utils.get_distributed_items(crops)
     vector = embedder.get_embeddings(distributed_crops)
     mean_vector = np.mean(vector, axis=0)
@@ -50,6 +50,7 @@ def run():
     crossed_ids = [set() for _ in video_paths]
     crops_per_ids = [defaultdict(list) for _ in video_paths]
     embedding_vectors_of_crossed_c042 = {}
+    embedding_vectors_c041 = {}
 
     masks = []
     for cap, pts in zip(caps, [mask_c041, mask_c042]):
@@ -103,24 +104,27 @@ def run():
                     if prev and track_id not in crossed_ids[i]:
                         if geometry_utils.segments_intersect(prev, (cx, cy), c042_cross_line[0], c042_cross_line[1]):
                             crossed_ids[i].add(track_id)
-                            embedding_vectors_of_crossed_c042[track_id] = calculate_embedding(crops_per_ids[i][track_id])
+                            embedding_vectors_of_crossed_c042[track_id] = calculate_embedding_exited_car(crops_per_ids[i][track_id])
 
                     prev_centers[i][track_id] = (cx, cy)
                     if track_id in crossed_ids[i]:
                         label = f"{label} crossed"
                 elif window_names[i] == "c041":
-                    cv2.line(frame, c041_cross_line[0], c041_cross_line[1], (0, 0, 255), 2)
-                    cx = int((x1 + x2) / 2)
-                    cy = int((y1 + y2) / 2)
-                    prev = prev_centers[i].get(track_id)
-                    if prev and track_id not in crossed_ids[i]:
-                        if geometry_utils.segments_intersect(prev, (cx, cy), c041_cross_line[0], c041_cross_line[1]):
-                             crossed_ids[i].add(track_id)
-                            # embedding_vectors_of_crossed_c041[track_id] = calculate_embedding(crops_per_ids[i][track_id])
+                    query_embedding = calculate_embedding_exited_car(crops_per_ids[i][track_id])
 
-                    prev_centers[i][track_id] = (cx, cy)
-                    if track_id in crossed_ids[i]:
-                        label = f"{label} crossed"
+
+                # cv2.line(frame, c041_cross_line[0], c041_cross_line[1], (0, 0, 255), 2)
+                    # cx = int((x1 + x2) / 2)
+                    # cy = int((y1 + y2) / 2)
+                    # prev = prev_centers[i].get(track_id)
+                    # if prev and track_id not in crossed_ids[i]:
+                    #     if geometry_utils.segments_intersect(prev, (cx, cy), c041_cross_line[0], c041_cross_line[1]):
+                    #          crossed_ids[i].add(track_id)
+                    #         # embedding_vectors_of_crossed_c041[track_id] = calculate_embedding(crops_per_ids[i][track_id])
+                    #
+                    # prev_centers[i][track_id] = (cx, cy)
+                    # if track_id in crossed_ids[i]:
+                    #     label = f"{label} crossed"
 
                 else:
                     raise Exception(f"unknown window name: {window_names[i]}")
