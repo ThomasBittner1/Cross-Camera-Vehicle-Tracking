@@ -3,13 +3,13 @@ import cv2
 from collections import deque, defaultdict
 
 
-def get_distributed_crops(crops, n=16):
-    if len(crops) <= n:
-        return crops
+def get_distributed_items(items, n=16):
+    if len(items) <= n:
+        return items
 
-    indices = np.round(np.linspace(0, len(crops) - 1, n)).astype(int)
-    distributed_crops = [crops[i] for i in indices]
-    return distributed_crops
+    indices = np.round(np.linspace(0, len(items) - 1, n)).astype(int)
+    distributed_items = [items[i] for i in indices]
+    return distributed_items
 
 
 class TrajectoryManager:
