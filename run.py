@@ -13,6 +13,7 @@ embedder = embedding_utils.EmbeddingGenerator()
 
 import importlib
 importlib.reload(geometry_utils)
+importlib.reload(embedding_utils)
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -25,6 +26,7 @@ mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 9
 
 c041_other_best_crops = {}
 c042_other_best_embedding_distance = {}
+c042_other_best_color_score = {}
 
 EMBEDDING_SIZE = 2048
 
@@ -33,12 +35,25 @@ def calculate_embedding_exited_car(crops):
     vector = embedder.get_embeddings(distributed_crops)
     mean_vector = np.mean(vector, axis=0)
     return mean_vector
-    print ('mean_vector: ', mean_vector)
 
 
 def calculate_embedding_single(crop):
     vector = embedder.get_embeddings([crop])[0]
     return vector
+
+
+def calculate_color_histograms_exited_car(crops):
+    distributed_crops = geometry_utils.get_distributed_items(crops)
+    histograms = []
+    for crop in distributed_crops:
+        histogram = embedding_utils.compute_vehicle_color_histogram(crop)
+        if histogram is not None:
+            histograms.append(histogram)
+    return histograms
+
+
+def calculate_color_histogram_single(crop):
+    return embedding_utils.compute_vehicle_color_histogram(crop)
 
 
 
@@ -65,6 +80,7 @@ def run():
     crossed_ids = [set() for _ in video_paths]
     crops_per_ids = [defaultdict(list) for _ in video_paths]
     embedding_vectors_of_crossed_c042 = {}
+    color_histograms_of_crossed_c042 = {}
     embedding_vectors_of_crossed_c041 = {}
 
     masks = []
@@ -133,6 +149,7 @@ def run():
                         if geometry_utils.segments_intersect(prev, (cx, cy), c042_cross_line[0], c042_cross_line[1]):
                             crossed_ids[f].add(track_id)
                             embedding_vectors_of_crossed_c042[track_id] = calculate_embedding_exited_car(crops_per_ids[f][track_id])
+                            color_histograms_of_crossed_c042[track_id] = calculate_color_histograms_exited_car(crops_per_ids[f][track_id])
 
                     prev_centers[f][track_id] = (cx, cy)
                     if track_id in crossed_ids[f]:
@@ -140,13 +157,28 @@ def run():
                 elif window_names[f] == "c041":
 
                     query_embedding = calculate_embedding_single(frame[y1:y2, x1:x2])
-                    closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery_c042)
+                    query_color_hist = calculate_color_histogram_single(frame[y1:y2, x1:x2])
+                    if gallery_c042.size == 0 or not gallery_c042_map:
+                        closest_embedding_idx, closest_embedding_score = None, None
+                    else:
+                        closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery_c042)
                     if closest_embedding_idx is not None:
                         other_track_id = gallery_c042_map[closest_embedding_idx]
-                        widths = [x.shape[1] for x in crops_per_ids[0][other_track_id]]
-                        biggest_shape_idx = np.argmax(widths)
-                        c041_other_best_crops[track_id] = crops_per_ids[0][other_track_id][biggest_shape_idx]
-                        c042_other_best_embedding_distance[track_id] = closest_embedding_score
+                        matched_color_idx, matched_color_score = embedding_utils.compare_color_histograms(
+                            query_color_hist,
+                            color_histograms_of_crossed_c042.get(other_track_id, []),
+                        )
+                        color_score = matched_color_score if matched_color_score is not None else 0.0
+                        combined_score = (0.8 * closest_embedding_score) + (0.2 * color_score)
+
+                        if combined_score >= 0.55:
+                            distributed_crops = geometry_utils.get_distributed_items(crops_per_ids[0][other_track_id])
+                            if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
+                                c041_other_best_crops[track_id] = distributed_crops[matched_color_idx]
+                            elif distributed_crops:
+                                c041_other_best_crops[track_id] = distributed_crops[0]
+                            c042_other_best_embedding_distance[track_id] = combined_score
+                            c042_other_best_color_score[track_id] = color_score
 
                         if track_id in c041_other_best_crops:
                             other_crop = c041_other_best_crops[track_id]
@@ -159,7 +191,7 @@ def run():
                             if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
                                 visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
                                 frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                                cv2.putText(frame, f"score: {round(c042_other_best_embedding_distance[track_id], 4)}",
+                                cv2.putText(frame, f"score: {round(c042_other_best_embedding_distance[track_id], 4)} color: {round(c042_other_best_color_score[track_id], 4)}",
                                             (paste_x1, min(frame.shape[0] - 10, paste_y2 + 20)),
                                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                 else:
