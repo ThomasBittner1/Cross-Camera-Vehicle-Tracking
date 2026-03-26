@@ -16,8 +16,8 @@ c042_cross_line = [(773, 175), (953, 256)]
 c041_cross_line = [(260, 331), (802, 906)]
 # masks are created with draw_mask.py
 
-mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
 mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
+mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
 
 EMBEDDING_SIZE = 2048
 
@@ -35,10 +35,10 @@ def run():
     # model = YOLO("yolo11m.pt")
 
     video_paths = [
-        r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
         r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
+        r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
     ]
-    window_names = ['c041', 'c042']
+    window_names = ['c042', 'c041']
     for window_name in window_names:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
@@ -56,7 +56,7 @@ def run():
     embedding_vectors_of_crossed_c041 = {}
 
     masks = []
-    for cap, pts in zip(caps, [mask_c041, mask_c042]):
+    for cap, pts in zip(caps, [mask_c042, mask_c041]):
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         mask = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
@@ -128,10 +128,13 @@ def run():
                             crossed_ids[f].add(track_id)
 
                             gallery = np.zeros((len(embedding_vectors_of_crossed_c042), EMBEDDING_SIZE), dtype='float64')
-                            for t, track_id in enumerate(sorted(embedding_vectors_of_crossed_c042.keys())):
-                                gallery[t] = embedding_vectors_of_crossed_c042[track_id]
-
-                            closest_embedding_value = embedding_utils.find_closest_embedding(query_embedding, gallery)
+                            gallery_map = []
+                            for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_c042.keys())):
+                                gallery[t] = embedding_vectors_of_crossed_c042[other_track_id]
+                                gallery_map.append(other_track_id)
+                            closest_embedding_idx, closest_embedding_value = embedding_utils.find_closest_embedding(query_embedding, gallery)
+                            other_track_id = gallery_map[closest_embedding_idx]
+                            print (f'last crop of {other_track_id}: {crops_per_ids[0][other_track_id][-1].shape}')
 
                     prev_centers[f][track_id] = (cx, cy)
                     if track_id in crossed_ids[f]:
