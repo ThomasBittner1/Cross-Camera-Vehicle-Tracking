@@ -136,8 +136,9 @@ def run():
                                 gallery_map.append(other_track_id)
                             closest_embedding_idx, closest_embedding_value = embedding_utils.find_closest_embedding(query_embedding, gallery)
                             other_track_id = gallery_map[closest_embedding_idx]
-                            c042_other_best_crops[track_id] = crops_per_ids[0][other_track_id][-1]
-                            print (f'last crop of {other_track_id}: {crops_per_ids[0][other_track_id][-1].shape}')
+                            widths = [x.shape[1] for x in crops_per_ids[0][other_track_id]]
+                            biggest_shape_idx = np.argmax(widths)
+                            c042_other_best_crops[track_id] = crops_per_ids[0][other_track_id][biggest_shape_idx]
 
                     prev_centers[f][track_id] = (cx, cy)
                     if track_id in crossed_ids[f]:
@@ -145,7 +146,15 @@ def run():
 
                     if track_id in c042_other_best_crops:
                         other_crop = c042_other_best_crops[track_id]
-                        print ('other_crop: ', other_crop.shape)
+                        crop_h, crop_w = other_crop.shape[:2]
+                        paste_y1 = y2
+                        paste_y2 = min(frame.shape[0], paste_y1 + crop_h)
+                        paste_x1 = max(0, x1)
+                        paste_x2 = min(frame.shape[1], paste_x1 + crop_w)
+
+                        if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
+                            visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
+                            frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
 
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
