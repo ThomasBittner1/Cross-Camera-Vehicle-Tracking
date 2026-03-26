@@ -19,7 +19,7 @@ c041_cross_line = [(260, 331), (802, 906)]
 mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
 mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
 
-c042_other_crops = {}
+c042_other_best_crops = {}
 
 EMBEDDING_SIZE = 2048
 
@@ -136,16 +136,16 @@ def run():
                                 gallery_map.append(other_track_id)
                             closest_embedding_idx, closest_embedding_value = embedding_utils.find_closest_embedding(query_embedding, gallery)
                             other_track_id = gallery_map[closest_embedding_idx]
-                            c042_other_crops[track_id] = crops_per_ids[0][other_track_id][-1]
+                            c042_other_best_crops[track_id] = crops_per_ids[0][other_track_id][-1]
                             print (f'last crop of {other_track_id}: {crops_per_ids[0][other_track_id][-1].shape}')
 
                     prev_centers[f][track_id] = (cx, cy)
                     if track_id in crossed_ids[f]:
                         label = f"{label} crossed"
 
-                    if track_id in c042_other_crops:
-                        other_crop = c042_other_crops[track_id]
-
+                    if track_id in c042_other_best_crops:
+                        other_crop = c042_other_best_crops[track_id]
+                        print ('other_crop: ', other_crop.shape)
 
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
