@@ -97,8 +97,8 @@ def run():
         rets_and_frames = [cap.read() for cap in caps]
         rets = [ret for ret, _ in rets_and_frames]
         frames = [frame for _, frame in rets_and_frames]
+        orig_frames = [np.copy(frame) for _, frame in rets_and_frames]
         masked_frames = [cv2.bitwise_and(frame, mask) for frame, mask in zip(frames, masks)]
-
         # frames = masked_frames
         if not all(rets):
             break
@@ -139,7 +139,7 @@ def run():
 
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     if not is_overlapping:
-                        crops_per_ids[f][track_id].append(frame[y1:y2, x1:x2])
+                        crops_per_ids[f][track_id].append(orig_frames[f][y1:y2, x1:x2])
 
                     cv2.line(frame, c042_cross_line[0], c042_cross_line[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
@@ -156,8 +156,8 @@ def run():
                         label = f"{label} crossed"
                 elif window_names[f] == "c041":
 
-                    query_embedding = calculate_embedding_single(frame[y1:y2, x1:x2])
-                    query_color_hist = calculate_color_histogram_single(frame[y1:y2, x1:x2])
+                    query_embedding = calculate_embedding_single(orig_frames[f][y1:y2, x1:x2])
+                    query_color_hist = calculate_color_histogram_single(orig_frames[f][y1:y2, x1:x2])
                     if gallery_c042.size == 0 or not gallery_c042_map:
                         closest_embedding_idx, closest_embedding_score = None, None
                     else:
