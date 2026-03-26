@@ -19,6 +19,8 @@ c041_cross_line = [(260, 331), (802, 906)]
 mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
 mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
 
+c042_other_crops = {}
+
 EMBEDDING_SIZE = 2048
 
 def calculate_embedding_exited_car(crops):
@@ -122,7 +124,7 @@ def run():
                     if prev and track_id not in crossed_ids[f]:
 
                         if geometry_utils.segments_intersect(prev, (cx, cy), c041_cross_line[0], c041_cross_line[1]):
-                            print(f'crossed in 41 - {track_id}')
+                            print(f'crossed in c041 - {track_id}')
                             query_embedding = calculate_embedding_exited_car(crops_per_ids[f][track_id])
 
                             crossed_ids[f].add(track_id)
@@ -134,11 +136,16 @@ def run():
                                 gallery_map.append(other_track_id)
                             closest_embedding_idx, closest_embedding_value = embedding_utils.find_closest_embedding(query_embedding, gallery)
                             other_track_id = gallery_map[closest_embedding_idx]
+                            c042_other_crops[track_id] = crops_per_ids[0][other_track_id][-1]
                             print (f'last crop of {other_track_id}: {crops_per_ids[0][other_track_id][-1].shape}')
 
                     prev_centers[f][track_id] = (cx, cy)
                     if track_id in crossed_ids[f]:
                         label = f"{label} crossed"
+
+                    if track_id in c042_other_crops:
+                        other_crop = c042_other_crops[track_id]
+
 
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
