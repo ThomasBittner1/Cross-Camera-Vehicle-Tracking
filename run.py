@@ -19,7 +19,7 @@ c041_cross_line = [(260, 331), (802, 906)]
 mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
 mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
 
-c042_other_best_crops = {}
+c041_other_best_crops = {}
 c042_other_best_embedding_distance = {}
 
 EMBEDDING_SIZE = 2048
@@ -30,6 +30,11 @@ def calculate_embedding_exited_car(crops):
     mean_vector = np.mean(vector, axis=0)
     return mean_vector
     print ('mean_vector: ', mean_vector)
+
+
+def calculate_embedding_single(crop):
+    vector = embedder.get_embeddings([crop])[0]
+    return vector
 
 
 
@@ -95,6 +100,14 @@ def run():
             else:
                 tracks = np.empty((0, 8), dtype=np.float32)
 
+
+            if window_names[f] == 'c041':
+                gallery_c042 = np.zeros((len(embedding_vectors_of_crossed_c042), EMBEDDING_SIZE), dtype='float64')
+                gallery_c042_map = []
+                for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_c042.keys())):
+                    gallery_c042[t] = embedding_vectors_of_crossed_c042[other_track_id]
+                    gallery_c042_map.append(other_track_id)
+
             for track in tracks:
                 x1, y1, x2, y2 = map(int, track[:4])
                 track_id = int(track[4])
@@ -118,53 +131,34 @@ def run():
                         label = f"{label} crossed"
                 elif window_names[f] == "c041":
 
-                    cv2.line(frame, c041_cross_line[0], c041_cross_line[1], (0, 0, 255), 2)
-                    cx = int((x1 + x2) / 2)
-                    cy = int((y1 + y2) / 2)
-                    prev = prev_centers[f].get(track_id)
-                    if prev and track_id not in crossed_ids[f]:
+                    query_embedding = calculate_embedding_single(frame[y1:y2, x1:x2])
+                    closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery_c042)
+                    if closest_embedding_idx is not None:
+                        other_track_id = gallery_c042_map[closest_embedding_idx]
+                        widths = [x.shape[1] for x in crops_per_ids[0][other_track_id]]
+                        biggest_shape_idx = np.argmax(widths)
+                        c041_other_best_crops[track_id] = crops_per_ids[0][other_track_id][biggest_shape_idx]
+                        c042_other_best_embedding_distance[track_id] = closest_embedding_score
 
-                        if geometry_utils.segments_intersect(prev, (cx, cy), c041_cross_line[0], c041_cross_line[1]):
-                            print(f'crossed in c041 - {track_id}')
-                            query_embedding = calculate_embedding_exited_car(crops_per_ids[f][track_id])
+                        if track_id in c041_other_best_crops:
+                            other_crop = c041_other_best_crops[track_id]
+                            crop_h, crop_w = other_crop.shape[:2]
+                            paste_y1 = y2
+                            paste_y2 = min(frame.shape[0], paste_y1 + crop_h)
+                            paste_x1 = max(0, x1)
+                            paste_x2 = min(frame.shape[1], paste_x1 + crop_w)
 
-                            crossed_ids[f].add(track_id)
-
-                            gallery = np.zeros((len(embedding_vectors_of_crossed_c042), EMBEDDING_SIZE), dtype='float64')
-                            gallery_map = []
-                            for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_c042.keys())):
-                                gallery[t] = embedding_vectors_of_crossed_c042[other_track_id]
-                                gallery_map.append(other_track_id)
-                            closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery)
-                            other_track_id = gallery_map[closest_embedding_idx]
-                            widths = [x.shape[1] for x in crops_per_ids[0][other_track_id]]
-                            biggest_shape_idx = np.argmax(widths)
-                            c042_other_best_crops[track_id] = crops_per_ids[0][other_track_id][biggest_shape_idx]
-                            c042_other_best_embedding_distance[track_id] = closest_embedding_score
-                    prev_centers[f][track_id] = (cx, cy)
-                    if track_id in crossed_ids[f]:
-                        label = f"{label} crossed"
-
-                    if track_id in c042_other_best_crops:
-                        other_crop = c042_other_best_crops[track_id]
-                        crop_h, crop_w = other_crop.shape[:2]
-                        paste_y1 = y2
-                        paste_y2 = min(frame.shape[0], paste_y1 + crop_h)
-                        paste_x1 = max(0, x1)
-                        paste_x2 = min(frame.shape[1], paste_x1 + crop_w)
-
-                        if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
-                            visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
-                            frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                            cv2.putText(frame, f"score: {c042_other_best_embedding_distance[track_id]}",
-                                        (paste_x1, min(frame.shape[0] - 10, paste_y2 + 20)),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                            if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
+                                visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
+                                frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
+                                cv2.putText(frame, f"score: {c042_other_best_embedding_distance[track_id]}",
+                                            (paste_x1, min(frame.shape[0] - 10, paste_y2 + 20)),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
                 cv2.putText(frame, label, (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             cv2.putText(frame, f"Frame {frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-
 
             cv2.imshow(window_names[f], frame)
 
