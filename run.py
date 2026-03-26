@@ -156,7 +156,9 @@ def run():
                         if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
                             visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
                             frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                            cv2.putText(frame, f"score: {c042_other_best_embedding_distance[track_id]}")
+                            cv2.putText(frame, f"score: {c042_other_best_embedding_distance[track_id]}",
+                                        (paste_x1, min(frame.shape[0] - 10, paste_y2 + 20)),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
                 cv2.putText(frame, label, (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
