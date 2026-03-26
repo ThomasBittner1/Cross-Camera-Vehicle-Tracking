@@ -12,6 +12,33 @@ def get_distributed_items(items, n=16):
     return distributed_items
 
 
+def is_box_overlapping(box, other_boxes, min_iou=0.2, box_id=None):
+    x1, y1, x2, y2 = map(int, box[:4])
+    current_area = max(0, x2 - x1) * max(0, y2 - y1)
+
+    for other_box in other_boxes:
+        other_id = int(other_box[4]) if len(other_box) > 4 else None
+        if box_id is not None and other_id == box_id:
+            continue
+
+        other_x1, other_y1, other_x2, other_y2 = map(int, other_box[:4])
+        inter_x1 = max(x1, other_x1)
+        inter_y1 = max(y1, other_y1)
+        inter_x2 = min(x2, other_x2)
+        inter_y2 = min(y2, other_y2)
+
+        inter_w = max(0, inter_x2 - inter_x1)
+        inter_h = max(0, inter_y2 - inter_y1)
+        intersection_area = inter_w * inter_h
+        other_area = max(0, other_x2 - other_x1) * max(0, other_y2 - other_y1)
+        union_area = current_area + other_area - intersection_area
+
+        if union_area > 0 and (intersection_area / union_area) >= min_iou:
+            return True
+
+    return False
+
+
 class TrajectoryManager:
     def __init__(self, max_points=30, max_lost_frames=5, on_delete_callback=None):
         self.max_points = max_points

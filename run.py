@@ -11,6 +11,10 @@ from collections import defaultdict
 embedder = embedding_utils.EmbeddingGenerator()
 
 
+import importlib
+importlib.reload(geometry_utils)
+
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 c042_cross_line = [(773, 175), (953, 256)]
 c041_cross_line = [(260, 331), (802, 906)]
@@ -113,10 +117,14 @@ def run():
                 track_id = int(track[4])
 
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                crops_per_ids[f][track_id].append(frame[y1:y2, x1:x2])
                 label = f"ID {track_id}"
 
                 if window_names[f] == "c042":
+
+                    is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
+                    if not is_overlapping:
+                        crops_per_ids[f][track_id].append(frame[y1:y2, x1:x2])
+
                     cv2.line(frame, c042_cross_line[0], c042_cross_line[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
@@ -151,7 +159,7 @@ def run():
                             if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
                                 visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
                                 frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                                cv2.putText(frame, f"score: {c042_other_best_embedding_distance[track_id]}",
+                                cv2.putText(frame, f"score: {round(c042_other_best_embedding_distance[track_id], 4)}",
                                             (paste_x1, min(frame.shape[0] - 10, paste_y2 + 20)),
                                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                 else:
