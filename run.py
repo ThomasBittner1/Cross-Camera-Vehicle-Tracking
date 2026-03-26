@@ -19,10 +19,13 @@ c041_cross_line = [(260, 331), (802, 906)]
 mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
 mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
 
+EMBEDDING_SIZE = 2048
+
 def calculate_embedding_exited_car(crops):
     distributed_crops = geometry_utils.get_distributed_items(crops)
     vector = embedder.get_embeddings(distributed_crops)
     mean_vector = np.mean(vector, axis=0)
+    return mean_vector
     print ('mean_vector: ', mean_vector)
 
 
@@ -50,7 +53,7 @@ def run():
     crossed_ids = [set() for _ in video_paths]
     crops_per_ids = [defaultdict(list) for _ in video_paths]
     embedding_vectors_of_crossed_c042 = {}
-    embedding_vectors_c041 = {}
+    embedding_vectors_of_crossed_c041 = {}
 
     masks = []
     for cap, pts in zip(caps, [mask_c041, mask_c042]):
@@ -78,7 +81,7 @@ def run():
             conf=0.5
         )
 
-        for i, (frame, result, tracker) in enumerate(zip(frames, results, trackers)):
+        for f, (frame, result, tracker) in enumerate(zip(frames, results, trackers)):
             if result.boxes is not None and len(result.boxes) > 0:
                 boxes = result.boxes.xyxy.cpu().numpy()
                 confs = result.boxes.conf.cpu().numpy().reshape(-1, 1)
@@ -94,46 +97,54 @@ def run():
                 track_id = int(track[4])
 
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                crops_per_ids[i][track_id].append(frame[y1:y2, x1:x2])
+                crops_per_ids[f][track_id].append(frame[y1:y2, x1:x2])
                 label = f"ID {track_id}"
-                if window_names[i] == "c042":
+
+                if window_names[f] == "c042":
                     cv2.line(frame, c042_cross_line[0], c042_cross_line[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
-                    prev = prev_centers[i].get(track_id)
-                    if prev and track_id not in crossed_ids[i]:
+                    prev = prev_centers[f].get(track_id)
+                    if prev and track_id not in crossed_ids[f]:
                         if geometry_utils.segments_intersect(prev, (cx, cy), c042_cross_line[0], c042_cross_line[1]):
-                            crossed_ids[i].add(track_id)
-                            embedding_vectors_of_crossed_c042[track_id] = calculate_embedding_exited_car(crops_per_ids[i][track_id])
+                            crossed_ids[f].add(track_id)
+                            embedding_vectors_of_crossed_c042[track_id] = calculate_embedding_exited_car(crops_per_ids[f][track_id])
 
-                    prev_centers[i][track_id] = (cx, cy)
-                    if track_id in crossed_ids[i]:
+                    prev_centers[f][track_id] = (cx, cy)
+                    if track_id in crossed_ids[f]:
                         label = f"{label} crossed"
-                elif window_names[i] == "c041":
-                    query_embedding = calculate_embedding_exited_car(crops_per_ids[i][track_id])
+                elif window_names[f] == "c041":
 
+                    cv2.line(frame, c041_cross_line[0], c041_cross_line[1], (0, 0, 255), 2)
+                    cx = int((x1 + x2) / 2)
+                    cy = int((y1 + y2) / 2)
+                    prev = prev_centers[f].get(track_id)
+                    if prev and track_id not in crossed_ids[f]:
 
-                # cv2.line(frame, c041_cross_line[0], c041_cross_line[1], (0, 0, 255), 2)
-                    # cx = int((x1 + x2) / 2)
-                    # cy = int((y1 + y2) / 2)
-                    # prev = prev_centers[i].get(track_id)
-                    # if prev and track_id not in crossed_ids[i]:
-                    #     if geometry_utils.segments_intersect(prev, (cx, cy), c041_cross_line[0], c041_cross_line[1]):
-                    #          crossed_ids[i].add(track_id)
-                    #         # embedding_vectors_of_crossed_c041[track_id] = calculate_embedding(crops_per_ids[i][track_id])
-                    #
-                    # prev_centers[i][track_id] = (cx, cy)
-                    # if track_id in crossed_ids[i]:
-                    #     label = f"{label} crossed"
+                        if geometry_utils.segments_intersect(prev, (cx, cy), c041_cross_line[0], c041_cross_line[1]):
+                            print(f'crossed in 41 - {track_id}')
+                            query_embedding = calculate_embedding_exited_car(crops_per_ids[f][track_id])
+
+                            crossed_ids[f].add(track_id)
+
+                            gallery = np.zeros((len(embedding_vectors_of_crossed_c042), EMBEDDING_SIZE), dtype='float64')
+                            for t, track_id in enumerate(sorted(embedding_vectors_of_crossed_c042.keys())):
+                                gallery[t] = embedding_vectors_of_crossed_c042[track_id]
+
+                            closest_embedding_value = embedding_utils.find_closest_embedding(query_embedding, gallery)
+
+                    prev_centers[f][track_id] = (cx, cy)
+                    if track_id in crossed_ids[f]:
+                        label = f"{label} crossed"
 
                 else:
-                    raise Exception(f"unknown window name: {window_names[i]}")
+                    raise Exception(f"unknown window name: {window_names[f]}")
                 cv2.putText(frame, label, (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             cv2.putText(frame, f"Frame {frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
 
-            cv2.imshow(window_names[i], frame)
+            cv2.imshow(window_names[f], frame)
 
         if paused:
             key = cv2.waitKey(0) & 0xFF
