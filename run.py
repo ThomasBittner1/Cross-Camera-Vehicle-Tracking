@@ -20,6 +20,7 @@ mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)
 mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
 
 c042_other_best_crops = {}
+c042_other_best_embedding_distance = {}
 
 EMBEDDING_SIZE = 2048
 
@@ -134,12 +135,12 @@ def run():
                             for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_c042.keys())):
                                 gallery[t] = embedding_vectors_of_crossed_c042[other_track_id]
                                 gallery_map.append(other_track_id)
-                            closest_embedding_idx, closest_embedding_value = embedding_utils.find_closest_embedding(query_embedding, gallery)
+                            closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery)
                             other_track_id = gallery_map[closest_embedding_idx]
                             widths = [x.shape[1] for x in crops_per_ids[0][other_track_id]]
                             biggest_shape_idx = np.argmax(widths)
                             c042_other_best_crops[track_id] = crops_per_ids[0][other_track_id][biggest_shape_idx]
-
+                            c042_other_best_embedding_distance[track_id] = closest_embedding_score
                     prev_centers[f][track_id] = (cx, cy)
                     if track_id in crossed_ids[f]:
                         label = f"{label} crossed"
@@ -155,7 +156,7 @@ def run():
                         if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
                             visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
                             frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-
+                            cv2.putText(frame, f"score: {c042_other_best_embedding_distance[track_id]}")
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
                 cv2.putText(frame, label, (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
