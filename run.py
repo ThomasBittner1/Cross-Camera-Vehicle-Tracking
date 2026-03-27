@@ -47,7 +47,7 @@ color_histograms_of_crossed_0 = {}
 embedding_histories_1 = defaultdict(list)
 
 
-def calculate_embedding_exited_car(crops, distributed_count=16, return_mean=True):
+def calculate_embedding_multiple(crops, distributed_count=16, return_mean=True):
     if distributed_count:
         distributed_crops = geometry_utils.get_distributed_items(crops, n=distributed_count)
     else:
@@ -61,12 +61,7 @@ def calculate_embedding_exited_car(crops, distributed_count=16, return_mean=True
         return vector
 
 
-def calculate_embedding_single(crop):
-    vector = embedder.get_embeddings([crop])[0]
-    return vector
-
-
-def calculate_color_histograms_exited_car(crops):
+def calculate_color_histograms_multiple(crops):
     distributed_crops = geometry_utils.get_distributed_items(crops)
     histograms = []
     for crop in distributed_crops:
@@ -129,15 +124,16 @@ def run():
                 tracks = np.empty((0, 8), dtype=np.float32)
 
 
-            # right camera: get galleries of left camera, and combined crop of right camera
             if f == 1:
+                # get galleries of left camera:
+                #
                 embedding_gallery_0 = np.zeros((len(embedding_vectors_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
                 embedding_gallery_0_map = []
                 for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_0.keys())):
                     embedding_gallery_0[t] = embedding_vectors_of_crossed_0[other_track_id]
                     embedding_gallery_0_map.append(other_track_id)
 
-                # append to embedding history
+                # append crops of right camera to their embedding histories
                 #
                 non_overlapping_crops_1 = []
                 non_overlapping_track_ids_1 = []
@@ -151,10 +147,10 @@ def run():
                         non_overlapping_crops_1.append(orig_frame_pair[f][y1:y2, x1:x2])
                     all_overlapping_1.append(is_overlapping)
 
-                all_current_embeddings_1 = calculate_embedding_exited_car(non_overlapping_crops_1, distributed_count=None, return_mean=False)
+                combined_current_embeddings_1 = calculate_embedding_multiple(non_overlapping_crops_1, distributed_count=None, return_mean=False)
                 if non_overlapping_crops_1:
-                    for tt, vector in enumerate(all_current_embeddings_1):
-                        track_id = non_overlapping_track_ids_1[tt]
+                    for c, vector in enumerate(combined_current_embeddings_1):
+                        track_id = non_overlapping_track_ids_1[c]
                         embedding_histories_1[track_id].append(vector)
 
 
@@ -180,8 +176,8 @@ def run():
                     if prev and track_id not in crossed_ids_0:
                         if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_0[0], CROSS_LINE_0[1]):
                             crossed_ids_0.add(track_id)
-                            embedding_vectors_of_crossed_0[track_id] = calculate_embedding_exited_car(crops_per_ids_0[track_id])
-                            color_histograms_of_crossed_0[track_id] = calculate_color_histograms_exited_car(crops_per_ids_0[track_id])
+                            embedding_vectors_of_crossed_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
+                            color_histograms_of_crossed_0[track_id] = calculate_color_histograms_multiple(crops_per_ids_0[track_id])
 
                     prev_centers_pair[f][track_id] = (cx, cy)
                     if track_id in crossed_ids_0:
