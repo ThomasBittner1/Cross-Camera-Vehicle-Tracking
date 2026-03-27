@@ -75,7 +75,8 @@ def run():
     other_best_color_score_1 = {}
 
     prev_centers_pair = [dict() for _ in video_path_pair]
-    crossed_ids_0 = set()
+    # crossed_ids_pair = [set(), set()]
+    crossed_times_pair = [{}, {}]
     crops_per_ids_0 = defaultdict(list)
     embeddings_of_crossed_per_id_0 = {}
     histograms_of_crossed_0 = {}
@@ -130,6 +131,7 @@ def run():
             else:
                 tracks = np.empty((0, 8), dtype=np.float32)
 
+            one_or_more_cars_crossed = False
 
             if f == 1:
                 # append crops of right camera to their embedding histories
@@ -163,37 +165,31 @@ def run():
 
                 cv2.line(frame_pair[f], CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1], (0, 0, 255), 2)
 
+                # checking if crossed
+                #
+                cx = int((x1 + x2) / 2)
+                cy = int((y1 + y2) / 2)
+                prev = prev_centers_pair[f].get(track_id)
+                if prev and track_id not in crossed_times_pair[f]:
+                    if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1]):
+                        # crossed_ids_pair[f].add(track_id)
+                        one_or_more_cars_crossed = True
+                        crossed_times_pair[f][track_id] = current_frame_index
+                        if f == 0:
+                            embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
+                            histograms_of_crossed_0[track_id] = calculate_histograms_multiple(crops_per_ids_0[track_id])
+
+
+                prev_centers_pair[f][track_id] = (cx, cy)
+                if track_id in crossed_times_pair[f]:
+                    label = f"{label} crossed"
+
                 # if car crosses red line -> record embeddings and histograms
                 #
                 if f == 0:
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     if not is_overlapping:
                         crops_per_ids_0[track_id].append(orig_frame_pair[f][y1:y2, x1:x2])
-
-                    # cv2.line(frame_pair[f], CROSS_LINE_0[0], CROSS_LINE_0[1], (0, 0, 255), 2)
-                    cx = int((x1 + x2) / 2)
-                    cy = int((y1 + y2) / 2)
-                    prev = prev_centers_pair[f].get(track_id)
-                    one_or_more_cars_crossed = False
-                    if prev and track_id not in crossed_ids_0:
-                        if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_0[0], CROSS_LINE_0[1]):
-                            crossed_ids_0.add(track_id)
-                            embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
-                            histograms_of_crossed_0[track_id] = calculate_histograms_multiple(crops_per_ids_0[track_id])
-                            one_or_more_cars_crossed = True
-                    prev_centers_pair[f][track_id] = (cx, cy)
-                    if track_id in crossed_ids_0:
-                        label = f"{label} crossed"
-
-                    if one_or_more_cars_crossed:
-                        # get galleries of left camera:
-                        #
-                        print ('recreateing embedding numpy array')
-                        embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), EMBEDDING_SIZE), dtype='float64')
-                        embedding_of_crossed_0_map.clear()
-                        for t, other_track_id in enumerate(sorted(embeddings_of_crossed_per_id_0.keys())):
-                            embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
-                            embedding_of_crossed_0_map.append(other_track_id)
 
                 # c041: compare embeddings and histograms at each frame
                 #
@@ -251,6 +247,16 @@ def run():
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
                 cv2.putText(frame_pair[f], label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[f], 2)
+
+
+            if f == 0 and  one_or_more_cars_crossed:
+                # get galleries of left camera:
+                #
+                embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), EMBEDDING_SIZE), dtype='float64')
+                embedding_of_crossed_0_map.clear()
+                for t, other_track_id in enumerate(sorted(embeddings_of_crossed_per_id_0.keys())):
+                    embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
+                    embedding_of_crossed_0_map.append(other_track_id)
 
             cv2.putText(frame_pair[f], f"Frame {current_frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
