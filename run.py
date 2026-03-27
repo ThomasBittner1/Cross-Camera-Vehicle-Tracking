@@ -31,12 +31,9 @@ c042_other_best_color_score = {}
 EMBEDDING_SIZE = 2048
 
 def calculate_embedding_exited_car(crops):
-    print ('crops: ', len(crops))
     distributed_crops = geometry_utils.get_distributed_items(crops)
-    print ('distributed_crops: ', len(distributed_crops))
 
     vector = embedder.get_embeddings(distributed_crops)
-    print ('vector: ', vector)
     mean_vector = np.mean(vector, axis=0)
     return mean_vector
 
@@ -143,8 +140,9 @@ def run():
                 if not is_overlapping:
                     crops_per_ids[f][track_id].append(orig_frames[f][y1:y2, x1:x2])
 
+                # left camera: if car crosses red line -> record embeddings and histograms
+                #
                 if window_names[f] == "c042":
-
                     cv2.line(frame, c042_cross_line[0], c042_cross_line[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
@@ -159,6 +157,9 @@ def run():
                     if track_id in crossed_ids[f]:
                         label = f"{label} crossed"
 
+
+                # right camera: always compare embeddings and histograms
+                #
                 elif window_names[f] == "c041":
                     if not is_overlapping:
                         query_embedding = calculate_embedding_exited_car(crops_per_ids[f][track_id])

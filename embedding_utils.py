@@ -68,8 +68,8 @@ def compute_vehicle_color_histogram(crop, h_bins=24, s_bins=16):
     return hist.astype(np.float32)
 
 
-def compare_color_histograms(query_hists, gallery_hists):
-    if query_hists is None or gallery_hists is None:
+def compare_color_histograms(query_hist, gallery_hists):
+    if query_hist is None or gallery_hists is None:
         return None, None
 
     best_idx = None
@@ -79,7 +79,7 @@ def compare_color_histograms(query_hists, gallery_hists):
             continue
 
         distance = cv2.compareHist(
-            query_hists.astype(np.float32),
+            query_hist.astype(np.float32),
             gallery_hist.astype(np.float32),
             cv2.HISTCMP_BHATTACHARYYA,
         )
