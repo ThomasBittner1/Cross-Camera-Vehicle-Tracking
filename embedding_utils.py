@@ -1,11 +1,11 @@
-import torch
-import torch.nn as nn
-import torchvision.models as models
-import torchvision.transforms as T
-from PIL import Image
+from pathlib import Path
+
 import cv2
 import numpy as np
-from pathlib import Path
+from PIL import Image
+import torch
+import torch.nn as nn
+import torchvision.transforms as T
 
 
 def l2_normalize(x, axis=1, eps=1e-10):
@@ -93,36 +93,156 @@ def compare_histograms(query_hist, gallery_hists):
     return best_idx, best_score
 
 
-class EmbeddingGenerator:
-    DEFAULT_VEHICLE_REID_PATH = Path("models") / "resnet50_ibn_vehicle_reid.ts"
+class IBN(nn.Module):
+    def __init__(self, planes, ratio=0.5):
+        super().__init__()
+        half1 = int(planes * ratio)
+        half2 = planes - half1
+        self.half = half1
+        self.IN = nn.InstanceNorm2d(half1, affine=True)
+        self.BN = nn.BatchNorm2d(half2)
 
-    def __init__(self, model_path=None, allow_generic_fallback=True):
+    def forward(self, x):
+        split = torch.split(x, [self.half, x.size(1) - self.half], dim=1)
+        out1 = self.IN(split[0].contiguous())
+        out2 = self.BN(split[1].contiguous())
+        return torch.cat((out1, out2), dim=1)
+
+
+def conv3x3(in_planes, out_planes, stride=1):
+    return nn.Conv2d(
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        stride=stride,
+        padding=1,
+        bias=False,
+    )
+
+
+def conv1x1(in_planes, out_planes, stride=1):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+
+
+class BottleneckIBN(nn.Module):
+    expansion = 4
+
+    def __init__(self, inplanes, planes, ibn=False, stride=1, downsample=None):
+        super().__init__()
+        self.conv1 = conv1x1(inplanes, planes)
+        self.bn1 = IBN(planes) if ibn else nn.BatchNorm2d(planes)
+        self.conv2 = conv3x3(planes, planes, stride)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.conv3 = conv1x1(planes, planes * self.expansion)
+        self.bn3 = nn.BatchNorm2d(planes * self.expansion)
+        self.relu = nn.ReLU(inplace=True)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        out = self.relu(out)
+        return out
+
+
+class ResNetIBNBackbone(nn.Module):
+    def __init__(self, layers=(3, 4, 6, 3), last_stride=2):
+        super().__init__()
+        self.inplanes = 64
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(64, layers[0], stride=1, ibn=True)
+        self.layer2 = self._make_layer(128, layers[1], stride=2, ibn=True)
+        self.layer3 = self._make_layer(256, layers[2], stride=2, ibn=True)
+        self.layer4 = self._make_layer(512, layers[3], stride=last_stride, ibn=False)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
+    def _make_layer(self, planes, blocks, stride, ibn):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * BottleneckIBN.expansion:
+            downsample = nn.Sequential(
+                conv1x1(self.inplanes, planes * BottleneckIBN.expansion, stride),
+                nn.BatchNorm2d(planes * BottleneckIBN.expansion),
+            )
+
+        layers = [BottleneckIBN(self.inplanes, planes, ibn=ibn, stride=stride, downsample=downsample)]
+        self.inplanes = planes * BottleneckIBN.expansion
+        for _ in range(1, blocks):
+            layers.append(BottleneckIBN(self.inplanes, planes, ibn=ibn))
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        return x
+
+
+class VehicleReIDResNetIBN(nn.Module):
+    def __init__(self, last_stride=2, embedding_dim=2048, dropout_p=0.5, num_classes=34071):
+        super().__init__()
+        self.model = ResNetIBNBackbone(last_stride=last_stride)
+        self.classifier = nn.Module()
+        self.classifier.add_block = nn.Sequential(
+            nn.Linear(2048, embedding_dim),
+            nn.BatchNorm1d(embedding_dim),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(p=dropout_p),
+        )
+        self.classifier.classifier = nn.Sequential(
+            nn.Linear(embedding_dim, num_classes),
+        )
+
+    def forward(self, x):
+        x = self.model(x)
+        x = self.classifier.add_block(x)
+        return x
+
+
+class EmbeddingGenerator:
+    DEFAULT_VEHICLE_REID_CKPT = Path("net_19.pth")
+    DEFAULT_VEHICLE_REID_OPTS = Path("opts.yaml")
+
+    def __init__(self, model_path=None, opts_path=None, allow_generic_fallback=False):
+        if allow_generic_fallback:
+            raise ValueError("Generic fallback is disabled for vehicle embeddings in this project.")
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"EmbeddingGenerator is using: {self.device}")
 
-        self.model_path = Path(model_path) if model_path else self.DEFAULT_VEHICLE_REID_PATH
+        self.model_path = Path(model_path) if model_path else self.DEFAULT_VEHICLE_REID_CKPT
+        self.opts_path = Path(opts_path) if opts_path else self.DEFAULT_VEHICLE_REID_OPTS
         self.model_kind = "vehicle_reid_resnet50_ibn"
-        self.uses_vehicle_model = False
+        self.uses_vehicle_model = True
 
-        if self.model_path.exists():
-            self.model = self._load_torchscript_vehicle_model(self.model_path)
-            self.uses_vehicle_model = True
-            print(f"Loaded vehicle ReID model from: {self.model_path}")
-        elif allow_generic_fallback:
-            print(
-                "WARNING: vehicle-specific ResNet50-IBN weights were not found at "
-                f"{self.model_path}. Falling back to generic ImageNet ResNet50."
-            )
-            self.model_kind = "generic_imagenet_resnet50"
-            self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-            self.model = nn.Sequential(*list(self.model.children())[:-1])
-        else:
-            raise FileNotFoundError(
-                "Vehicle ReID weights are required but were not found at "
-                f"{self.model_path}. Export a pretrained ResNet50-IBN vehicle ReID model "
-                "to TorchScript and place it there, or pass model_path explicitly."
-            )
-
+        self.model = self._load_vehicle_model(self.model_path, self.opts_path)
         self.model.to(self.device)
         self.model.eval()
 
@@ -133,33 +253,55 @@ class EmbeddingGenerator:
         ])
         self.embedding_dim = self._infer_embedding_dim()
 
-    def _load_torchscript_vehicle_model(self, model_path):
-        model = torch.jit.load(str(model_path), map_location=self.device)
+    def _load_vehicle_model(self, model_path, opts_path):
+        if not model_path.exists():
+            raise FileNotFoundError(
+                f"Vehicle ReID checkpoint was not found at {model_path}."
+            )
+        if not opts_path.exists():
+            raise FileNotFoundError(
+                f"Vehicle ReID opts file was not found at {opts_path}."
+            )
+
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
+        if not isinstance(checkpoint, dict):
+            raise ValueError(f"Unexpected checkpoint type in {model_path}: {type(checkpoint).__name__}")
+
+        model = VehicleReIDResNetIBN()
+        model_state = model.state_dict()
+
+        missing_keys = []
+        for key in model_state:
+            if key not in checkpoint:
+                missing_keys.append(key)
+                continue
+            model_state[key] = checkpoint[key]
+
+        if missing_keys:
+            raise ValueError(
+                "Checkpoint is missing required keys for the vehicle ReID model. "
+                f"Examples: {missing_keys[:10]}"
+            )
+
+        model.load_state_dict(model_state, strict=True)
         return model
 
     def _infer_embedding_dim(self):
         sample = torch.zeros(1, 3, 224, 224, device=self.device)
         with torch.no_grad():
             output = self.model(sample)
-        return int(output.view(output.size(0), -1).shape[1])
+        return int(output.shape[1])
 
     @torch.no_grad()
     def get_embeddings(self, crops):
-        """
-        frame: Full BGR image
-        bboxes: List or array of [x1, y1, x2, y2]
-        """
         if len(crops) == 0:
             return None
 
         batch_tensors = []
-
         for crop in crops:
-
             if crop.size == 0:
                 continue
 
-            # Convert to RGB -> PIL -> Tensor
             crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
             pil_img = Image.fromarray(crop_rgb)
             batch_tensors.append(self.preprocess(pil_img))
@@ -168,10 +310,8 @@ class EmbeddingGenerator:
             return None
 
         input_batch = torch.stack(batch_tensors).to(self.device)
-
         embeddings = self.model(input_batch)
-
-        return embeddings.view(embeddings.size(0), -1).cpu().numpy()
+        return embeddings.cpu().numpy()
 
     @staticmethod
     def normalize_embeddings(embeddings):
