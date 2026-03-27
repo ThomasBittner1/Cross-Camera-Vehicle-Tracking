@@ -8,9 +8,6 @@ from boxmot import OcSort
 import time
 from collections import defaultdict
 
-embedder = embedding_utils.EmbeddingGenerator()
-
-
 import importlib
 importlib.reload(geometry_utils)
 importlib.reload(embedding_utils)
@@ -19,11 +16,10 @@ importlib.reload(embedding_utils)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 COLORS_PAIR = [(255, 0, 0), (0, 255, 0)]
-EMBEDDING_SIZE = 2048
 EMBEDDING_SIMILARITY_THRESHOLD = 0.3
 COLOR_SIMILARITY_THRESHOLD = 0.3
 
-START_FRAME_INDEX = 800
+START_FRAME_INDEX = 950
 window_name_pair = ['c042', 'c041']
 
 video_path_pair = [
@@ -39,7 +35,7 @@ MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1,
 
 
 
-def calculate_embedding_multiple(crops, distributed_count=16, return_mean=True):
+def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_mean=True):
     if distributed_count:
         distributed_crops = geometry_utils.get_distributed_items(crops, n=distributed_count)
     else:
@@ -69,6 +65,8 @@ def calculate_color_histogram_single(crop):
 
 
 def run():
+    embedder = embedding_utils.EmbeddingGenerator()
+    embedding_size = embedder.embedding_dim
     model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt") # started with "yolo11m.pt"
 
     # other_best_crops_1 = {}
@@ -153,7 +151,7 @@ def run():
                         non_overlapping_crops_1.append(orig_frame_pair[f][y1:y2, x1:x2])
                     all_overlapping_1.append(is_overlapping)
 
-                combined_current_embeddings_1 = calculate_embedding_multiple(non_overlapping_crops_1, distributed_count=None, return_mean=False)
+                combined_current_embeddings_1 = calculate_embedding_multiple(embedder, non_overlapping_crops_1, distributed_count=None, return_mean=False)
                 if non_overlapping_crops_1:
                     for c, vector in enumerate(combined_current_embeddings_1):
                         track_id = non_overlapping_track_ids_1[c]
@@ -181,7 +179,7 @@ def run():
                         one_or_more_cars_crossed = True
                         crossed_times_pair[f][track_id] = current_frame_index
                         if f == 0:
-                            embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
+                            embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(embedder, crops_per_ids_0[track_id])
                             histograms_of_crossed_0[track_id] = calculate_histograms_multiple(crops_per_ids_0[track_id])
 
 
@@ -261,7 +259,7 @@ def run():
             if f == 0 and  one_or_more_cars_crossed:
                 # get galleries of left camera:
                 #
-                embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), EMBEDDING_SIZE), dtype='float64')
+                embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), embedding_size), dtype='float64')
                 embedding_of_crossed_0_map.clear()
                 for t, other_track_id in enumerate(sorted(embeddings_of_crossed_per_id_0.keys())):
                     embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
