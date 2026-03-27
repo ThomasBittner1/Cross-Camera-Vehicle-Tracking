@@ -224,19 +224,29 @@ def run():
                                 c042_other_best_color_score[track_id] = color_score
 
                             if track_id in c041_other_best_crops:
+                                label = (
+                                    f"{label} score: {round(c042_other_best_embedding_distance[track_id], 4)}"
+                                    f" color: {round(c042_other_best_color_score[track_id], 4)}"
+                                )
                                 other_crop = c041_other_best_crops[track_id]
                                 crop_h, crop_w = other_crop.shape[:2]
-                                paste_y1 = y2
-                                paste_y2 = min(frame.shape[0], paste_y1 + crop_h)
-                                paste_x1 = max(0, x1)
-                                paste_x2 = min(frame.shape[1], paste_x1 + crop_w)
+                                box_w = max(1, x2 - x1)
+                                target_w = max(1, int(round(box_w * 0.5)))
+                                scale = target_w / max(1, crop_w)
+                                target_h = max(1, int(round(crop_h * scale)))
+                                resized_crop = cv2.resize(other_crop, (target_w, target_h))
 
-                                if paste_y1 < frame.shape[0] and paste_x1 < frame.shape[1]:
-                                    visible_crop = other_crop[:paste_y2 - paste_y1, :paste_x2 - paste_x1]
+                                paste_x2 = min(frame.shape[1], x2)
+                                paste_y2 = min(frame.shape[0], y2)
+                                paste_x1 = max(0, paste_x2 - target_w)
+                                paste_y1 = max(0, paste_y2 - target_h)
+
+                                if paste_y1 < paste_y2 and paste_x1 < paste_x2:
+                                    visible_crop = resized_crop[
+                                        target_h - (paste_y2 - paste_y1):,
+                                        target_w - (paste_x2 - paste_x1):,
+                                    ]
                                     frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                                    cv2.putText(frame, f"score: {round(c042_other_best_embedding_distance[track_id], 4)} color: {round(c042_other_best_color_score[track_id], 4)}",
-                                                (paste_x1, min(frame.shape[0] - 10, paste_y2 + 20)),
-                                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
                 cv2.putText(frame, label, (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
