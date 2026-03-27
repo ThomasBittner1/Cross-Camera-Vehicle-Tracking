@@ -220,35 +220,35 @@ def run():
 
                                 closest_total_score = closest_embedding_score * matched_color_score
 
-                                best_matches_1[track_id] = (closest_total_score, closest_embedding_score, matched_color_score, other_crop)
+                                if track_id not in best_matches_1 or best_matches_1[track_id][0] < closest_total_score:
+                                    best_matches_1[track_id] = (closest_total_score, closest_embedding_score, matched_color_score, other_crop)
 
-                            if track_id in best_matches_1:
+                    if track_id in best_matches_1:
+                        closest_total_score, closest_embedding_score, matched_color_score, other_crop = best_matches_1[track_id]
 
-                                closest_total_score, closest_embedding_score, matched_color_score, other_crop = best_matches_1[track_id]
+                        label = (
+                            f"{label} score: {round(closest_embedding_score, 4)}"
+                            f" color: {round(matched_color_score, 4)}"
+                        )
+                        crop_h, crop_w = other_crop.shape[:2]
+                        box_w = max(1, x2 - x1)
+                        target_w = max(1, int(round(box_w * 0.5)))
+                        scale = target_w / max(1, crop_w)
+                        target_h = max(1, int(round(crop_h * scale)))
+                        resized_crop = cv2.resize(other_crop, (target_w, target_h))
 
-                                label = (
-                                    f"{label} score: {round(closest_embedding_score, 4)}"
-                                    f" color: {round(matched_color_score, 4)}"
-                                )
-                                crop_h, crop_w = other_crop.shape[:2]
-                                box_w = max(1, x2 - x1)
-                                target_w = max(1, int(round(box_w * 0.5)))
-                                scale = target_w / max(1, crop_w)
-                                target_h = max(1, int(round(crop_h * scale)))
-                                resized_crop = cv2.resize(other_crop, (target_w, target_h))
+                        paste_x2 = min(frame_pair[f].shape[1], x2)
+                        paste_y2 = min(frame_pair[f].shape[0], y2)
+                        paste_x1 = max(0, paste_x2 - target_w)
+                        paste_y1 = max(0, paste_y2 - target_h)
 
-                                paste_x2 = min(frame_pair[f].shape[1], x2)
-                                paste_y2 = min(frame_pair[f].shape[0], y2)
-                                paste_x1 = max(0, paste_x2 - target_w)
-                                paste_y1 = max(0, paste_y2 - target_h)
-
-                                if paste_y1 < paste_y2 and paste_x1 < paste_x2:
-                                    visible_crop = resized_crop[
-                                        target_h - (paste_y2 - paste_y1):,
-                                        target_w - (paste_x2 - paste_x1):,
-                                    ]
-                                    frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                                cv2.putText(frame_pair[f], 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                        if paste_y1 < paste_y2 and paste_x1 < paste_x2:
+                            visible_crop = resized_crop[
+                                target_h - (paste_y2 - paste_y1):,
+                                target_w - (paste_x2 - paste_x1):,
+                            ]
+                            frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
+                        cv2.putText(frame_pair[f], 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
