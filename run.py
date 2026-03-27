@@ -82,8 +82,7 @@ def calculate_color_histogram_single(crop):
 
 
 def run():
-    model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt")
-    # model = YOLO("yolo11m.pt")
+    model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt") # started with "yolo11m.pt"
 
     for window_name in window_name_pair:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -94,7 +93,7 @@ def run():
     paused = False
 
     tracker_pair = [OcSort() for _ in video_path_pair]
-    frame_index = 0
+    current_frame_index = 0
 
     mask_pair = []
     for f, cap in enumerate(cap_pair):
@@ -252,7 +251,7 @@ def run():
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
                 cv2.putText(frame, label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[f], 2)
 
-            cv2.putText(frame, f"Frame {frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            cv2.putText(frame, f"Frame {current_frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
             cv2.imshow(window_name_pair[f], frame)
 
@@ -269,7 +268,7 @@ def run():
             paused = not paused
 
         if not paused:
-            frame_index += 1
+            current_frame_index += 1
 
     for cap in cap_pair:
         cap.release()
