@@ -42,7 +42,7 @@ other_best_color_score_1 = {}
 prev_centers_pair = [dict() for _ in video_path_pair]
 crossed_ids_0 = set()
 crops_per_ids_0 = defaultdict(list)
-embeddings_of_crossed_0 = {}
+embeddings_of_crossed_per_id_0 = {}
 histograms_of_crossed_0 = {}
 embedding_histories_1 = defaultdict(list)
 
@@ -127,11 +127,11 @@ def run():
             if f == 1:
                 # get galleries of left camera:
                 #
-                embedding_gallery_0 = np.zeros((len(embeddings_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
-                embedding_gallery_0_map = []
-                for t, other_track_id in enumerate(sorted(embeddings_of_crossed_0.keys())):
-                    embedding_gallery_0[t] = embeddings_of_crossed_0[other_track_id]
-                    embedding_gallery_0_map.append(other_track_id)
+                embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), EMBEDDING_SIZE), dtype='float64')
+                embedding_of_crossed_0_map = []
+                for t, other_track_id in enumerate(sorted(embeddings_of_crossed_per_id_0.keys())):
+                    embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
+                    embedding_of_crossed_0_map.append(other_track_id)
 
                 # append crops of right camera to their embedding histories
                 #
@@ -176,7 +176,7 @@ def run():
                     if prev and track_id not in crossed_ids_0:
                         if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_0[0], CROSS_LINE_0[1]):
                             crossed_ids_0.add(track_id)
-                            embeddings_of_crossed_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
+                            embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
                             histograms_of_crossed_0[track_id] = calculate_histograms_multiple(crops_per_ids_0[track_id])
 
                     prev_centers_pair[f][track_id] = (cx, cy)
@@ -190,14 +190,14 @@ def run():
                     if not all_overlapping_1[t]:
                         query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
 
-                        if embedding_gallery_0.size == 0 or not embedding_gallery_0_map:
+                        if embedding_of_crossed_0.size == 0 or not embedding_of_crossed_0_map:
                             closest_embedding_idx, closest_embedding_score = None, None
                         else:
-                            closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, embedding_gallery_0)
+                            closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, embedding_of_crossed_0)
 
                         if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
                             query_color_hist = calculate_color_histogram_single(orig_frame_pair[f][y1:y2, x1:x2])
-                            other_track_id = embedding_gallery_0_map[closest_embedding_idx]
+                            other_track_id = embedding_of_crossed_0_map[closest_embedding_idx]
                             matched_color_idx, matched_color_score = embedding_utils.compare_histograms(
                                 query_color_hist,
                                 histograms_of_crossed_0.get(other_track_id, []))
