@@ -70,9 +70,9 @@ def calculate_color_histogram_single(crop):
 def run():
     model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt") # started with "yolo11m.pt"
 
-    other_best_crops_1 = {}
-    other_best_embedding_distance_1 = {}
-    other_best_color_score_1 = {}
+    # other_best_crops_1 = {}
+    # other_best_embedding_distance_1 = {}
+    # other_best_color_score_1 = {}
 
     prev_centers_pair = [dict() for _ in video_path_pair]
     # crossed_ids_pair = [set(), set()]
@@ -83,6 +83,8 @@ def run():
     embedding_histories_1 = defaultdict(list)
     embedding_of_crossed_0_map = []
     embedding_of_crossed_0 = np.zeros(0)
+
+    best_matches_1 = {}
 
     best_matched_ids_1 = {}
     best_matched_scores = {}
@@ -212,18 +214,22 @@ def run():
                             if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
                                 distributed_crops = geometry_utils.get_distributed_items(crops_per_ids_0[other_track_id])
                                 if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
-                                    other_best_crops_1[track_id] = distributed_crops[matched_color_idx]
+                                    other_crop = distributed_crops[matched_color_idx]
                                 elif distributed_crops:
-                                    other_best_crops_1[track_id] = distributed_crops[0]
-                                other_best_embedding_distance_1[track_id] = closest_embedding_score
-                                other_best_color_score_1[track_id] = matched_color_score
+                                    other_crop = distributed_crops[0]
 
-                            if track_id in other_best_crops_1:
+                                closest_total_score = closest_embedding_score * matched_color_score
+
+                                best_matches_1[track_id] = (closest_total_score, closest_embedding_score, matched_color_score, other_crop)
+
+                            if track_id in best_matches_1:
+
+                                closest_total_score, closest_embedding_score, matched_color_score, other_crop = best_matches_1[track_id]
+
                                 label = (
-                                    f"{label} score: {round(other_best_embedding_distance_1[track_id], 4)}"
-                                    f" color: {round(other_best_color_score_1[track_id], 4)}"
+                                    f"{label} score: {round(closest_embedding_score, 4)}"
+                                    f" color: {round(matched_color_score, 4)}"
                                 )
-                                other_crop = other_best_crops_1[track_id]
                                 crop_h, crop_w = other_crop.shape[:2]
                                 box_w = max(1, x2 - x1)
                                 target_w = max(1, int(round(box_w * 0.5)))
