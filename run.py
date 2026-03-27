@@ -115,21 +115,16 @@ def run():
         if not all(ret_pair):
             break
 
-        results = model.predict(
-            source=masked_frame_pair,
-            verbose=False,
-            conf=0.5
-        )
+        result_pair = model.predict(source=masked_frame_pair, verbose=False, conf=0.5)
 
-
-        for f, (frame, result, tracker) in enumerate(zip(frame_pair, results, tracker_pair)):
-            if result.boxes is not None and len(result.boxes) > 0:
-                boxes = result.boxes.xyxy.cpu().numpy()
-                confs = result.boxes.conf.cpu().numpy().reshape(-1, 1)
-                clss = result.boxes.cls.cpu().numpy().reshape(-1, 1)
+        for f in [0,1]:
+            if result_pair[f].boxes is not None and len(result_pair[f].boxes) > 0:
+                boxes = result_pair[f].boxes.xyxy.cpu().numpy()
+                confs = result_pair[f].boxes.conf.cpu().numpy().reshape(-1, 1)
+                clss = result_pair[f].boxes.cls.cpu().numpy().reshape(-1, 1)
 
                 detections = np.hstack((boxes, confs, clss)).astype(np.float32)
-                tracks = tracker.update(detections, frame)
+                tracks = tracker_pair[f].update(detections, frame_pair[f])
             else:
                 tracks = np.empty((0, 8), dtype=np.float32)
 
@@ -168,7 +163,7 @@ def run():
                 x1, y1, x2, y2 = map(int, track[:4])
                 track_id = int(track[4])
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), COLORS_PAIR[f], 2)
+                cv2.rectangle(frame_pair[f], (x1, y1), (x2, y2), COLORS_PAIR[f], 2)
                 label = f"ID {track_id}"
 
                 # if car crosses red line -> record embeddings and histograms
@@ -178,7 +173,7 @@ def run():
                     if not is_overlapping:
                         crops_per_ids_0[track_id].append(orig_frame_pair[f][y1:y2, x1:x2])
 
-                    cv2.line(frame, CROSS_LINE_0[0], CROSS_LINE_0[1], (0, 0, 255), 2)
+                    cv2.line(frame_pair[f], CROSS_LINE_0[0], CROSS_LINE_0[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
                     prev = prev_centers_pair[f].get(track_id)
@@ -234,8 +229,8 @@ def run():
                                 target_h = max(1, int(round(crop_h * scale)))
                                 resized_crop = cv2.resize(other_crop, (target_w, target_h))
 
-                                paste_x2 = min(frame.shape[1], x2)
-                                paste_y2 = min(frame.shape[0], y2)
+                                paste_x2 = min(frame_pair[f].shape[1], x2)
+                                paste_y2 = min(frame_pair[f].shape[0], y2)
                                 paste_x1 = max(0, paste_x2 - target_w)
                                 paste_y1 = max(0, paste_y2 - target_h)
 
@@ -244,16 +239,16 @@ def run():
                                         target_h - (paste_y2 - paste_y1):,
                                         target_w - (paste_x2 - paste_x1):,
                                     ]
-                                    frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                                cv2.putText(frame, 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                                    frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
+                                cv2.putText(frame_pair[f], 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
-                cv2.putText(frame, label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[f], 2)
+                cv2.putText(frame_pair[f], label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[f], 2)
 
-            cv2.putText(frame, f"Frame {current_frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            cv2.putText(frame_pair[f], f"Frame {current_frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
-            cv2.imshow(window_name_pair[f], frame)
+            cv2.imshow(window_name_pair[f], frame_pair[f])
 
         if paused:
             key = cv2.waitKey(0) & 0xFF
