@@ -30,12 +30,18 @@ c042_other_best_color_score = {}
 
 EMBEDDING_SIZE = 2048
 
-def calculate_embedding_exited_car(crops):
-    distributed_crops = geometry_utils.get_distributed_items(crops)
+def calculate_embedding_exited_car(crops, distributed_count=16, return_mean=True):
+    if distributed_count:
+        distributed_crops = geometry_utils.get_distributed_items(crops, n=distributed_count)
+    else:
+        distributed_crops = crops
 
     vector = embedder.get_embeddings(distributed_crops)
-    mean_vector = np.mean(vector, axis=0)
-    return mean_vector
+    if return_mean:
+        mean_vector = np.mean(vector, axis=0)
+        return mean_vector
+    else:
+        return vector
 
 
 def calculate_embedding_single(crop):
@@ -84,6 +90,8 @@ def run():
     color_histograms_of_crossed_c042 = {}
     embedding_vectors_of_crossed_c041 = {}
 
+    embedding_histories_1 = defaultdict(list)
+
     masks = []
     for cap, pts in zip(caps, [mask_c042, mask_c041]):
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -110,6 +118,7 @@ def run():
             conf=0.5
         )
 
+
         for f, (frame, result, tracker) in enumerate(zip(frames, results, trackers)):
             if result.boxes is not None and len(result.boxes) > 0:
                 boxes = result.boxes.xyxy.cpu().numpy()
@@ -122,6 +131,7 @@ def run():
                 tracks = np.empty((0, 8), dtype=np.float32)
 
 
+            # right camera: get galleries of left camera, and combined crop of right camera
             if window_names[f] == 'c041':
                 gallery_c042 = np.zeros((len(embedding_vectors_of_crossed_c042), EMBEDDING_SIZE), dtype='float64')
                 gallery_c042_map = []
@@ -129,20 +139,44 @@ def run():
                     gallery_c042[t] = embedding_vectors_of_crossed_c042[other_track_id]
                     gallery_c042_map.append(other_track_id)
 
-            for track in tracks:
+                # append to embedding history
+                #
+                non_overlapping_crops_1 = []
+                non_overlapping_track_ids = []
+                all_overlapping_1 = []
+                for t,track in enumerate(tracks):
+                    x1, y1, x2, y2 = map(int, track[:4])
+                    track_id = int(track[4])
+                    is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
+                    if not is_overlapping:
+                        non_overlapping_track_ids.append(track_id)
+                        non_overlapping_crops_1.append(orig_frames[f][y1:y2, x1:x2])
+
+                    all_overlapping_1.append(is_overlapping)
+
+                all_current_embeddings_1 = calculate_embedding_exited_car(non_overlapping_crops_1, distributed_count=None, return_mean=False)
+                if non_overlapping_crops_1:
+                    for tt, vector in enumerate(all_current_embeddings_1):
+                        track_id = non_overlapping_track_ids[tt]
+                        embedding_histories_1[track_id].append(vector)
+
+
+            are_overlapping = []
+            for t, track in enumerate(tracks):
                 x1, y1, x2, y2 = map(int, track[:4])
                 track_id = int(track[4])
 
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 label = f"ID {track_id}"
 
-                is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
-                if not is_overlapping:
-                    crops_per_ids[f][track_id].append(orig_frames[f][y1:y2, x1:x2])
+                if f == 0:
+                    is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
+                    if not is_overlapping:
+                        crops_per_ids[f][track_id].append(orig_frames[f][y1:y2, x1:x2])
 
-                # left camera: if car crosses red line -> record embeddings and histograms
+                # c042: if car crosses red line -> record embeddings and histograms
                 #
-                if window_names[f] == "c042":
+                if f == 0:
                     cv2.line(frame, c042_cross_line[0], c042_cross_line[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
@@ -158,12 +192,14 @@ def run():
                         label = f"{label} crossed"
 
 
-                # right camera: always compare embeddings and histograms
+                # c041: always compare embeddings and histograms
                 #
-                elif window_names[f] == "c041":
-                    if not is_overlapping:
-                        query_embedding = calculate_embedding_exited_car(crops_per_ids[f][track_id])
+                elif f == 1:
+                    if not all_overlapping_1[t]:
+                        # query_embedding = calculate_embedding_exited_car(crops_per_ids[f][track_id])
+                        query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
                         query_color_hist = calculate_color_histogram_single(orig_frames[f][y1:y2, x1:x2])
+
                         if gallery_c042.size == 0 or not gallery_c042_map:
                             closest_embedding_idx, closest_embedding_score = None, None
                         else:
