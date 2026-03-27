@@ -68,7 +68,7 @@ def compute_vehicle_color_histogram(crop, h_bins=24, s_bins=16):
     return hist.astype(np.float32)
 
 
-def compare_color_histograms(query_hist, gallery_hists):
+def compare_histograms(query_hist, gallery_hists):
     if query_hist is None or gallery_hists is None:
         return None, None
 

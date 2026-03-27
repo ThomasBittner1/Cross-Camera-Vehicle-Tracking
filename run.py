@@ -42,8 +42,8 @@ other_best_color_score_1 = {}
 prev_centers_pair = [dict() for _ in video_path_pair]
 crossed_ids_0 = set()
 crops_per_ids_0 = defaultdict(list)
-embedding_vectors_of_crossed_0 = {}
-color_histograms_of_crossed_0 = {}
+embeddings_of_crossed_0 = {}
+histograms_of_crossed_0 = {}
 embedding_histories_1 = defaultdict(list)
 
 
@@ -61,7 +61,7 @@ def calculate_embedding_multiple(crops, distributed_count=16, return_mean=True):
         return vector
 
 
-def calculate_color_histograms_multiple(crops):
+def calculate_histograms_multiple(crops):
     distributed_crops = geometry_utils.get_distributed_items(crops)
     histograms = []
     for crop in distributed_crops:
@@ -127,10 +127,10 @@ def run():
             if f == 1:
                 # get galleries of left camera:
                 #
-                embedding_gallery_0 = np.zeros((len(embedding_vectors_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
+                embedding_gallery_0 = np.zeros((len(embeddings_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
                 embedding_gallery_0_map = []
-                for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_0.keys())):
-                    embedding_gallery_0[t] = embedding_vectors_of_crossed_0[other_track_id]
+                for t, other_track_id in enumerate(sorted(embeddings_of_crossed_0.keys())):
+                    embedding_gallery_0[t] = embeddings_of_crossed_0[other_track_id]
                     embedding_gallery_0_map.append(other_track_id)
 
                 # append crops of right camera to their embedding histories
@@ -176,8 +176,8 @@ def run():
                     if prev and track_id not in crossed_ids_0:
                         if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_0[0], CROSS_LINE_0[1]):
                             crossed_ids_0.add(track_id)
-                            embedding_vectors_of_crossed_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
-                            color_histograms_of_crossed_0[track_id] = calculate_color_histograms_multiple(crops_per_ids_0[track_id])
+                            embeddings_of_crossed_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
+                            histograms_of_crossed_0[track_id] = calculate_histograms_multiple(crops_per_ids_0[track_id])
 
                     prev_centers_pair[f][track_id] = (cx, cy)
                     if track_id in crossed_ids_0:
@@ -198,10 +198,9 @@ def run():
                         if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
                             query_color_hist = calculate_color_histogram_single(orig_frame_pair[f][y1:y2, x1:x2])
                             other_track_id = embedding_gallery_0_map[closest_embedding_idx]
-                            matched_color_idx, matched_color_score = embedding_utils.compare_color_histograms(
+                            matched_color_idx, matched_color_score = embedding_utils.compare_histograms(
                                 query_color_hist,
-                                color_histograms_of_crossed_0.get(other_track_id, []),
-                            )
+                                histograms_of_crossed_0.get(other_track_id, []))
 
                             if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
                                 distributed_crops = geometry_utils.get_distributed_items(crops_per_ids_0[other_track_id])
