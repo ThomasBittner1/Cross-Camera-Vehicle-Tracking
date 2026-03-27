@@ -30,7 +30,8 @@ video_path_pair = [
     r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
 ]
 
-CROSS_LINE_0 = [(773, 175), (953, 256)]
+CROSS_LINE_BOTH = [[(773, 175), (953, 256)],
+                    [(227, 283), (731, 956)]]
 
 MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
                  [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]]
@@ -82,6 +83,8 @@ def run():
     embedding_of_crossed_0_map = []
     embedding_of_crossed_0 = np.zeros(0)
 
+    best_matched_ids_1 = {}
+    best_matched_scores = {}
 
     for window_name in window_name_pair:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -158,6 +161,8 @@ def run():
                 cv2.rectangle(frame_pair[f], (x1, y1), (x2, y2), COLORS_PAIR[f], 2)
                 label = f"ID {track_id}"
 
+                cv2.line(frame_pair[f], CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1], (0, 0, 255), 2)
+
                 # if car crosses red line -> record embeddings and histograms
                 #
                 if f == 0:
@@ -165,7 +170,7 @@ def run():
                     if not is_overlapping:
                         crops_per_ids_0[track_id].append(orig_frame_pair[f][y1:y2, x1:x2])
 
-                    cv2.line(frame_pair[f], CROSS_LINE_0[0], CROSS_LINE_0[1], (0, 0, 255), 2)
+                    # cv2.line(frame_pair[f], CROSS_LINE_0[0], CROSS_LINE_0[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
                     prev = prev_centers_pair[f].get(track_id)
@@ -190,7 +195,7 @@ def run():
                             embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
                             embedding_of_crossed_0_map.append(other_track_id)
 
-                # c041: always compare embeddings and histograms
+                # c041: compare embeddings and histograms at each frame
                 #
                 elif f == 1:
                     if not all_overlapping_1[t]:
