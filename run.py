@@ -137,30 +137,30 @@ def run():
 
             # right camera: get galleries of left camera, and combined crop of right camera
             if f == 1:
-                gallery_c042 = np.zeros((len(embedding_vectors_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
-                gallery_c042_map = []
+                embedding_gallery_0 = np.zeros((len(embedding_vectors_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
+                embedding_gallery_0_map = []
                 for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_0.keys())):
-                    gallery_c042[t] = embedding_vectors_of_crossed_0[other_track_id]
-                    gallery_c042_map.append(other_track_id)
+                    embedding_gallery_0[t] = embedding_vectors_of_crossed_0[other_track_id]
+                    embedding_gallery_0_map.append(other_track_id)
 
                 # append to embedding history
                 #
                 non_overlapping_crops_1 = []
-                non_overlapping_track_ids = []
+                non_overlapping_track_ids_1 = []
                 all_overlapping_1 = []
                 for t,track in enumerate(tracks):
                     x1, y1, x2, y2 = map(int, track[:4])
                     track_id = int(track[4])
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     if not is_overlapping:
-                        non_overlapping_track_ids.append(track_id)
+                        non_overlapping_track_ids_1.append(track_id)
                         non_overlapping_crops_1.append(orig_frame_pair[f][y1:y2, x1:x2])
                     all_overlapping_1.append(is_overlapping)
 
                 all_current_embeddings_1 = calculate_embedding_exited_car(non_overlapping_crops_1, distributed_count=None, return_mean=False)
                 if non_overlapping_crops_1:
                     for tt, vector in enumerate(all_current_embeddings_1):
-                        track_id = non_overlapping_track_ids[tt]
+                        track_id = non_overlapping_track_ids_1[tt]
                         embedding_histories_1[track_id].append(vector)
 
 
@@ -172,14 +172,13 @@ def run():
                 cv2.rectangle(frame, (x1, y1), (x2, y2), COLORS_PAIR[f], 2)
                 label = f"ID {track_id}"
 
+                # if car crosses red line -> record embeddings and histograms
+                #
                 if f == 0:
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     if not is_overlapping:
                         crops_per_ids_0[track_id].append(orig_frame_pair[f][y1:y2, x1:x2])
 
-                # c042: if car crosses red line -> record embeddings and histograms
-                #
-                if f == 0:
                     cv2.line(frame, CROSS_LINE_0[0], CROSS_LINE_0[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
@@ -201,14 +200,14 @@ def run():
                     if not all_overlapping_1[t]:
                         query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
 
-                        if gallery_c042.size == 0 or not gallery_c042_map:
+                        if embedding_gallery_0.size == 0 or not embedding_gallery_0_map:
                             closest_embedding_idx, closest_embedding_score = None, None
                         else:
-                            closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery_c042)
+                            closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, embedding_gallery_0)
 
                         if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
                             query_color_hist = calculate_color_histogram_single(orig_frame_pair[f][y1:y2, x1:x2])
-                            other_track_id = gallery_c042_map[closest_embedding_idx]
+                            other_track_id = embedding_gallery_0_map[closest_embedding_idx]
                             matched_color_idx, matched_color_score = embedding_utils.compare_color_histograms(
                                 query_color_hist,
                                 color_histograms_of_crossed_0.get(other_track_id, []),
