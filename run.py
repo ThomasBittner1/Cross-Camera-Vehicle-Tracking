@@ -23,6 +23,7 @@ EMBEDDING_SIZE = 2048
 EMBEDDING_SIMILARITY_THRESHOLD = 0.3
 COLOR_SIMILARITY_THRESHOLD = 0.3
 
+START_FRAME_INDEX = 800
 window_name_pair = ['c042', 'c041']
 
 video_path_pair = [
@@ -93,12 +94,14 @@ def run():
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     cap_pair = [cv2.VideoCapture(video_path) for video_path in video_path_pair]
+    for cap in cap_pair:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, START_FRAME_INDEX)
     fps = cap_pair[0].get(cv2.CAP_PROP_FPS) or 10.0
     delay_ms = max(1, int(round(1000.0 / fps)))
     paused = False
 
     tracker_pair = [OcSort() for _ in video_path_pair]
-    current_frame_index = 0
+    current_frame_index = START_FRAME_INDEX
 
     mask_pair = []
     for f, cap in enumerate(cap_pair):
