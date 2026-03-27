@@ -96,34 +96,34 @@ def run():
     tracker_pair = [OcSort() for _ in video_path_pair]
     frame_index = 0
 
-    masks = []
+    mask_pair = []
     for f, cap in enumerate(cap_pair):
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         mask = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
         pts = np.array(MASK_PTS_PAIR[f], dtype=np.int32)
         cv2.fillPoly(mask, [pts], (255, 255, 255))
-        masks.append(mask)
+        mask_pair.append(mask)
 
     while True:
         loop_start = time.perf_counter()
-        rets_and_frames = [cap.read() for cap in cap_pair]
-        rets = [ret for ret, _ in rets_and_frames]
-        frames = [frame for _, frame in rets_and_frames]
-        orig_frames = [np.copy(frame) for _, frame in rets_and_frames]
-        masked_frames = [cv2.bitwise_and(frame, mask) for frame, mask in zip(frames, masks)]
-        # frames = masked_frames
-        if not all(rets):
+        ret_and_frame_pair = [cap.read() for cap in cap_pair]
+        ret_pair = [ret for ret, _ in ret_and_frame_pair]
+        frame_pair = [frame for _, frame in ret_and_frame_pair]
+        orig_frame_pair = [np.copy(frame) for _, frame in ret_and_frame_pair]
+        masked_frame_pair = [cv2.bitwise_and(frame, mask) for frame, mask in zip(frame_pair, mask_pair)]
+
+        if not all(ret_pair):
             break
 
         results = model.predict(
-            source=masked_frames,
+            source=masked_frame_pair,
             verbose=False,
             conf=0.5
         )
 
 
-        for f, (frame, result, tracker) in enumerate(zip(frames, results, tracker_pair)):
+        for f, (frame, result, tracker) in enumerate(zip(frame_pair, results, tracker_pair)):
             if result.boxes is not None and len(result.boxes) > 0:
                 boxes = result.boxes.xyxy.cpu().numpy()
                 confs = result.boxes.conf.cpu().numpy().reshape(-1, 1)
@@ -136,7 +136,7 @@ def run():
 
 
             # right camera: get galleries of left camera, and combined crop of right camera
-            if window_name_pair[f] == 'c041':
+            if f == 1:
                 gallery_c042 = np.zeros((len(embedding_vectors_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
                 gallery_c042_map = []
                 for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_0.keys())):
@@ -154,8 +154,7 @@ def run():
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     if not is_overlapping:
                         non_overlapping_track_ids.append(track_id)
-                        non_overlapping_crops_1.append(orig_frames[f][y1:y2, x1:x2])
-
+                        non_overlapping_crops_1.append(orig_frame_pair[f][y1:y2, x1:x2])
                     all_overlapping_1.append(is_overlapping)
 
                 all_current_embeddings_1 = calculate_embedding_exited_car(non_overlapping_crops_1, distributed_count=None, return_mean=False)
@@ -176,7 +175,7 @@ def run():
                 if f == 0:
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     if not is_overlapping:
-                        crops_per_ids_0[track_id].append(orig_frames[f][y1:y2, x1:x2])
+                        crops_per_ids_0[track_id].append(orig_frame_pair[f][y1:y2, x1:x2])
 
                 # c042: if car crosses red line -> record embeddings and histograms
                 #
@@ -208,7 +207,7 @@ def run():
                             closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery_c042)
 
                         if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
-                            query_color_hist = calculate_color_histogram_single(orig_frames[f][y1:y2, x1:x2])
+                            query_color_hist = calculate_color_histogram_single(orig_frame_pair[f][y1:y2, x1:x2])
                             other_track_id = gallery_c042_map[closest_embedding_idx]
                             matched_color_idx, matched_color_score = embedding_utils.compare_color_histograms(
                                 query_color_hist,
