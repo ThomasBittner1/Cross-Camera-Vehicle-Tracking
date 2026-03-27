@@ -18,21 +18,33 @@ importlib.reload(embedding_utils)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+COLORS_PAIR = [(255, 0, 0), (0, 255, 0)]
+EMBEDDING_SIZE = 2048
+EMBEDDING_SIMILARITY_THRESHOLD = 0.3
+COLOR_SIMILARITY_THRESHOLD = 0.3
 
+window_name_pair = ['c042', 'c041']
 
-cross_line_0 = [(773, 175), (953, 256)]
+video_path_pair = [
+    r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
+    r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
+]
 
-# masks are created with draw_mask.py
-double_double = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
+CROSS_LINE_0 = [(773, 175), (953, 256)]
+
+MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
                  [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]]
 
 other_best_crops_1 = {}
 other_best_embedding_distance_1 = {}
 other_best_color_score_1 = {}
 
-EMBEDDING_SIZE = 2048
-EMBEDDING_SIMILARITY_THRESHOLD = 0.3
-COLOR_SIMILARITY_THRESHOLD = 0.3
+prev_centers_pair = [dict() for _ in video_path_pair]
+crossed_ids_0 = set()
+crops_per_ids_0 = defaultdict(list)
+embedding_vectors_of_crossed_0 = {}
+color_histograms_of_crossed_0 = {}
+embedding_histories_1 = defaultdict(list)
 
 
 def calculate_embedding_exited_car(crops, distributed_count=16, return_mean=True):
@@ -73,44 +85,29 @@ def run():
     model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt")
     # model = YOLO("yolo11m.pt")
 
-    video_paths = [
-        r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
-        r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
-    ]
-    window_names = ['c042', 'c041']
-    for window_name in window_names:
+    for window_name in window_name_pair:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
-    caps = [cv2.VideoCapture(video_path) for video_path in video_paths]
-    fps = caps[0].get(cv2.CAP_PROP_FPS) or 10.0
+    cap_pair = [cv2.VideoCapture(video_path) for video_path in video_path_pair]
+    fps = cap_pair[0].get(cv2.CAP_PROP_FPS) or 10.0
     delay_ms = max(1, int(round(1000.0 / fps)))
     paused = False
 
-    trackers = [OcSort() for _ in video_paths]
+    tracker_pair = [OcSort() for _ in video_path_pair]
     frame_index = 0
-    prev_centers = [dict() for _ in video_paths]
-    crossed_ids = [set() for _ in video_paths]
-    crops_per_ids = [defaultdict(list) for _ in video_paths]
-    embedding_vectors_of_crossed_c042 = {}
-    color_histograms_of_crossed_c042 = {}
-    embedding_vectors_of_crossed_c041 = {}
-
-    embedding_histories_1 = defaultdict(list)
-
-    colors = [(255, 0, 0), (0, 255, 0)]
 
     masks = []
-    for f, cap in enumerate(caps):
+    for f, cap in enumerate(cap_pair):
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         mask = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
-        pts = np.array(double_double[f], dtype=np.int32)
+        pts = np.array(MASK_PTS_PAIR[f], dtype=np.int32)
         cv2.fillPoly(mask, [pts], (255, 255, 255))
         masks.append(mask)
 
     while True:
         loop_start = time.perf_counter()
-        rets_and_frames = [cap.read() for cap in caps]
+        rets_and_frames = [cap.read() for cap in cap_pair]
         rets = [ret for ret, _ in rets_and_frames]
         frames = [frame for _, frame in rets_and_frames]
         orig_frames = [np.copy(frame) for _, frame in rets_and_frames]
@@ -126,7 +123,7 @@ def run():
         )
 
 
-        for f, (frame, result, tracker) in enumerate(zip(frames, results, trackers)):
+        for f, (frame, result, tracker) in enumerate(zip(frames, results, tracker_pair)):
             if result.boxes is not None and len(result.boxes) > 0:
                 boxes = result.boxes.xyxy.cpu().numpy()
                 confs = result.boxes.conf.cpu().numpy().reshape(-1, 1)
@@ -139,11 +136,11 @@ def run():
 
 
             # right camera: get galleries of left camera, and combined crop of right camera
-            if window_names[f] == 'c041':
-                gallery_c042 = np.zeros((len(embedding_vectors_of_crossed_c042), EMBEDDING_SIZE), dtype='float64')
+            if window_name_pair[f] == 'c041':
+                gallery_c042 = np.zeros((len(embedding_vectors_of_crossed_0), EMBEDDING_SIZE), dtype='float64')
                 gallery_c042_map = []
-                for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_c042.keys())):
-                    gallery_c042[t] = embedding_vectors_of_crossed_c042[other_track_id]
+                for t, other_track_id in enumerate(sorted(embedding_vectors_of_crossed_0.keys())):
+                    gallery_c042[t] = embedding_vectors_of_crossed_0[other_track_id]
                     gallery_c042_map.append(other_track_id)
 
                 # append to embedding history
@@ -173,29 +170,29 @@ def run():
                 x1, y1, x2, y2 = map(int, track[:4])
                 track_id = int(track[4])
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), colors[f], 2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), COLORS_PAIR[f], 2)
                 label = f"ID {track_id}"
 
                 if f == 0:
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     if not is_overlapping:
-                        crops_per_ids[f][track_id].append(orig_frames[f][y1:y2, x1:x2])
+                        crops_per_ids_0[track_id].append(orig_frames[f][y1:y2, x1:x2])
 
                 # c042: if car crosses red line -> record embeddings and histograms
                 #
                 if f == 0:
-                    cv2.line(frame, cross_line_0[0], cross_line_0[1], (0, 0, 255), 2)
+                    cv2.line(frame, CROSS_LINE_0[0], CROSS_LINE_0[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
-                    prev = prev_centers[f].get(track_id)
-                    if prev and track_id not in crossed_ids[f]:
-                        if geometry_utils.segments_intersect(prev, (cx, cy), cross_line_0[0], cross_line_0[1]):
-                            crossed_ids[f].add(track_id)
-                            embedding_vectors_of_crossed_c042[track_id] = calculate_embedding_exited_car(crops_per_ids[f][track_id])
-                            color_histograms_of_crossed_c042[track_id] = calculate_color_histograms_exited_car(crops_per_ids[f][track_id])
+                    prev = prev_centers_pair[f].get(track_id)
+                    if prev and track_id not in crossed_ids_0:
+                        if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_0[0], CROSS_LINE_0[1]):
+                            crossed_ids_0.add(track_id)
+                            embedding_vectors_of_crossed_0[track_id] = calculate_embedding_exited_car(crops_per_ids_0[track_id])
+                            color_histograms_of_crossed_0[track_id] = calculate_color_histograms_exited_car(crops_per_ids_0[track_id])
 
-                    prev_centers[f][track_id] = (cx, cy)
-                    if track_id in crossed_ids[f]:
+                    prev_centers_pair[f][track_id] = (cx, cy)
+                    if track_id in crossed_ids_0:
                         label = f"{label} crossed"
 
 
@@ -215,11 +212,11 @@ def run():
                             other_track_id = gallery_c042_map[closest_embedding_idx]
                             matched_color_idx, matched_color_score = embedding_utils.compare_color_histograms(
                                 query_color_hist,
-                                color_histograms_of_crossed_c042.get(other_track_id, []),
+                                color_histograms_of_crossed_0.get(other_track_id, []),
                             )
 
                             if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
-                                distributed_crops = geometry_utils.get_distributed_items(crops_per_ids[0][other_track_id])
+                                distributed_crops = geometry_utils.get_distributed_items(crops_per_ids_0[other_track_id])
                                 if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
                                     other_best_crops_1[track_id] = distributed_crops[matched_color_idx]
                                 elif distributed_crops:
@@ -251,15 +248,15 @@ def run():
                                         target_w - (paste_x2 - paste_x1):,
                                     ]
                                     frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                                cv2.putText(frame, 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, colors[0], 2)
+                                cv2.putText(frame, 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
                 else:
-                    raise Exception(f"unknown window name: {window_names[f]}")
-                cv2.putText(frame, label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, colors[f], 2)
+                    raise Exception(f"unknown window name: {window_name_pair[f]}")
+                cv2.putText(frame, label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[f], 2)
 
             cv2.putText(frame, f"Frame {frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
-            cv2.imshow(window_names[f], frame)
+            cv2.imshow(window_name_pair[f], frame)
 
         if paused:
             key = cv2.waitKey(0) & 0xFF
@@ -276,6 +273,6 @@ def run():
         if not paused:
             frame_index += 1
 
-    for cap in caps:
+    for cap in cap_pair:
         cap.release()
     cv2.destroyAllWindows()
