@@ -29,6 +29,9 @@ c042_other_best_embedding_distance = {}
 c042_other_best_color_score = {}
 
 EMBEDDING_SIZE = 2048
+EMBEDDING_SIMILARITY_THRESHOLD = 0.3
+COLOR_SIMILARITY_THRESHOLD = 0.3
+
 
 def calculate_embedding_exited_car(crops, distributed_count=16, return_mean=True):
     if distributed_count:
@@ -91,6 +94,8 @@ def run():
     embedding_vectors_of_crossed_c041 = {}
 
     embedding_histories_1 = defaultdict(list)
+
+    colors = [(255, 0, 0), (0, 255, 0)]
 
     masks = []
     for cap, pts in zip(caps, [mask_c042, mask_c041]):
@@ -166,7 +171,7 @@ def run():
                 x1, y1, x2, y2 = map(int, track[:4])
                 track_id = int(track[4])
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), colors[f], 2)
                 label = f"ID {track_id}"
 
                 if f == 0:
@@ -196,32 +201,29 @@ def run():
                 #
                 elif f == 1:
                     if not all_overlapping_1[t]:
-                        # query_embedding = calculate_embedding_exited_car(crops_per_ids[f][track_id])
                         query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
-                        query_color_hist = calculate_color_histogram_single(orig_frames[f][y1:y2, x1:x2])
 
                         if gallery_c042.size == 0 or not gallery_c042_map:
                             closest_embedding_idx, closest_embedding_score = None, None
                         else:
                             closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, gallery_c042)
 
-                        if closest_embedding_idx is not None:
+                        if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
+                            query_color_hist = calculate_color_histogram_single(orig_frames[f][y1:y2, x1:x2])
                             other_track_id = gallery_c042_map[closest_embedding_idx]
                             matched_color_idx, matched_color_score = embedding_utils.compare_color_histograms(
                                 query_color_hist,
                                 color_histograms_of_crossed_c042.get(other_track_id, []),
                             )
-                            color_score = matched_color_score if matched_color_score is not None else 0.0
-                            combined_score = (0.8 * closest_embedding_score) + (0.2 * color_score)
 
-                            if combined_score >= 0.55:
+                            if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
                                 distributed_crops = geometry_utils.get_distributed_items(crops_per_ids[0][other_track_id])
                                 if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
                                     c041_other_best_crops[track_id] = distributed_crops[matched_color_idx]
                                 elif distributed_crops:
                                     c041_other_best_crops[track_id] = distributed_crops[0]
-                                c042_other_best_embedding_distance[track_id] = combined_score
-                                c042_other_best_color_score[track_id] = color_score
+                                c042_other_best_embedding_distance[track_id] = closest_embedding_score
+                                c042_other_best_color_score[track_id] = matched_color_score
 
                             if track_id in c041_other_best_crops:
                                 label = (
@@ -247,9 +249,11 @@ def run():
                                         target_w - (paste_x2 - paste_x1):,
                                     ]
                                     frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
+                                cv2.putText(frame, 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, colors[0], 2)
+
                 else:
                     raise Exception(f"unknown window name: {window_names[f]}")
-                cv2.putText(frame, label, (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                cv2.putText(frame, label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, colors[f], 2)
 
             cv2.putText(frame, f"Frame {frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
