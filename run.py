@@ -129,14 +129,6 @@ def run():
 
 
             if f == 1:
-                # get galleries of left camera:
-                #
-                embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), EMBEDDING_SIZE), dtype='float64')
-                embedding_of_crossed_0_map = []
-                for t, other_track_id in enumerate(sorted(embeddings_of_crossed_per_id_0.keys())):
-                    embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
-                    embedding_of_crossed_0_map.append(other_track_id)
-
                 # append crops of right camera to their embedding histories
                 #
                 non_overlapping_crops_1 = []
@@ -189,7 +181,14 @@ def run():
                         label = f"{label} crossed"
 
                     if one_or_more_cars_crossed:
-                        pass
+                        # get galleries of left camera:
+                        #
+                        print ('recreateing embedding numpy array')
+                        embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), EMBEDDING_SIZE), dtype='float64')
+                        embedding_of_crossed_0_map.clear()
+                        for t, other_track_id in enumerate(sorted(embeddings_of_crossed_per_id_0.keys())):
+                            embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
+                            embedding_of_crossed_0_map.append(other_track_id)
 
                 # c041: always compare embeddings and histograms
                 #
