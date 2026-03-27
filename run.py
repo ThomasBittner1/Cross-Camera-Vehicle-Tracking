@@ -17,16 +17,18 @@ importlib.reload(embedding_utils)
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-c042_cross_line = [(773, 175), (953, 256)]
-c041_cross_line = [(260, 331), (802, 906)]
+
+
+
+cross_line_0 = [(773, 175), (953, 256)]
+
 # masks are created with draw_mask.py
+double_double = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
+                 [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]]
 
-mask_c042 = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
-mask_c041 = [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]
-
-c041_other_best_crops = {}
-c042_other_best_embedding_distance = {}
-c042_other_best_color_score = {}
+other_best_crops_1 = {}
+other_best_embedding_distance_1 = {}
+other_best_color_score_1 = {}
 
 EMBEDDING_SIZE = 2048
 EMBEDDING_SIMILARITY_THRESHOLD = 0.3
@@ -98,11 +100,11 @@ def run():
     colors = [(255, 0, 0), (0, 255, 0)]
 
     masks = []
-    for cap, pts in zip(caps, [mask_c042, mask_c041]):
+    for f, cap in enumerate(caps):
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         mask = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
-        pts = np.array(pts, dtype=np.int32)
+        pts = np.array(double_double[f], dtype=np.int32)
         cv2.fillPoly(mask, [pts], (255, 255, 255))
         masks.append(mask)
 
@@ -182,12 +184,12 @@ def run():
                 # c042: if car crosses red line -> record embeddings and histograms
                 #
                 if f == 0:
-                    cv2.line(frame, c042_cross_line[0], c042_cross_line[1], (0, 0, 255), 2)
+                    cv2.line(frame, cross_line_0[0], cross_line_0[1], (0, 0, 255), 2)
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
                     prev = prev_centers[f].get(track_id)
                     if prev and track_id not in crossed_ids[f]:
-                        if geometry_utils.segments_intersect(prev, (cx, cy), c042_cross_line[0], c042_cross_line[1]):
+                        if geometry_utils.segments_intersect(prev, (cx, cy), cross_line_0[0], cross_line_0[1]):
                             crossed_ids[f].add(track_id)
                             embedding_vectors_of_crossed_c042[track_id] = calculate_embedding_exited_car(crops_per_ids[f][track_id])
                             color_histograms_of_crossed_c042[track_id] = calculate_color_histograms_exited_car(crops_per_ids[f][track_id])
@@ -219,18 +221,18 @@ def run():
                             if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
                                 distributed_crops = geometry_utils.get_distributed_items(crops_per_ids[0][other_track_id])
                                 if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
-                                    c041_other_best_crops[track_id] = distributed_crops[matched_color_idx]
+                                    other_best_crops_1[track_id] = distributed_crops[matched_color_idx]
                                 elif distributed_crops:
-                                    c041_other_best_crops[track_id] = distributed_crops[0]
-                                c042_other_best_embedding_distance[track_id] = closest_embedding_score
-                                c042_other_best_color_score[track_id] = matched_color_score
+                                    other_best_crops_1[track_id] = distributed_crops[0]
+                                other_best_embedding_distance_1[track_id] = closest_embedding_score
+                                other_best_color_score_1[track_id] = matched_color_score
 
-                            if track_id in c041_other_best_crops:
+                            if track_id in other_best_crops_1:
                                 label = (
-                                    f"{label} score: {round(c042_other_best_embedding_distance[track_id], 4)}"
-                                    f" color: {round(c042_other_best_color_score[track_id], 4)}"
+                                    f"{label} score: {round(other_best_embedding_distance_1[track_id], 4)}"
+                                    f" color: {round(other_best_color_score_1[track_id], 4)}"
                                 )
-                                other_crop = c041_other_best_crops[track_id]
+                                other_crop = other_best_crops_1[track_id]
                                 crop_h, crop_w = other_crop.shape[:2]
                                 box_w = max(1, x2 - x1)
                                 target_w = max(1, int(round(box_w * 0.5)))
