@@ -35,16 +35,6 @@ CROSS_LINE_0 = [(773, 175), (953, 256)]
 MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
                  [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]]
 
-other_best_crops_1 = {}
-other_best_embedding_distance_1 = {}
-other_best_color_score_1 = {}
-
-prev_centers_pair = [dict() for _ in video_path_pair]
-crossed_ids_0 = set()
-crops_per_ids_0 = defaultdict(list)
-embeddings_of_crossed_per_id_0 = {}
-histograms_of_crossed_0 = {}
-embedding_histories_1 = defaultdict(list)
 
 
 def calculate_embedding_multiple(crops, distributed_count=16, return_mean=True):
@@ -78,6 +68,20 @@ def calculate_color_histogram_single(crop):
 
 def run():
     model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt") # started with "yolo11m.pt"
+
+    other_best_crops_1 = {}
+    other_best_embedding_distance_1 = {}
+    other_best_color_score_1 = {}
+
+    prev_centers_pair = [dict() for _ in video_path_pair]
+    crossed_ids_0 = set()
+    crops_per_ids_0 = defaultdict(list)
+    embeddings_of_crossed_per_id_0 = {}
+    histograms_of_crossed_0 = {}
+    embedding_histories_1 = defaultdict(list)
+    embedding_of_crossed_0_map = []
+    embedding_of_crossed_0 = np.zeros(0)
+
 
     for window_name in window_name_pair:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -173,16 +177,19 @@ def run():
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
                     prev = prev_centers_pair[f].get(track_id)
+                    one_or_more_cars_crossed = False
                     if prev and track_id not in crossed_ids_0:
                         if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_0[0], CROSS_LINE_0[1]):
                             crossed_ids_0.add(track_id)
                             embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(crops_per_ids_0[track_id])
                             histograms_of_crossed_0[track_id] = calculate_histograms_multiple(crops_per_ids_0[track_id])
-
+                            one_or_more_cars_crossed = True
                     prev_centers_pair[f][track_id] = (cx, cy)
                     if track_id in crossed_ids_0:
                         label = f"{label} crossed"
 
+                    if one_or_more_cars_crossed:
+                        pass
 
                 # c041: always compare embeddings and histograms
                 #
