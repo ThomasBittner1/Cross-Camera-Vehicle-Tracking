@@ -3,6 +3,7 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import embedding_utils
+import color_utils
 import geometry_utils
 from boxmot import OcSort
 import time
@@ -11,6 +12,7 @@ from collections import defaultdict
 import importlib
 importlib.reload(geometry_utils)
 importlib.reload(embedding_utils)
+importlib.reload(color_utils)
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -53,14 +55,14 @@ def calculate_histograms_multiple(crops):
     distributed_crops = geometry_utils.get_distributed_items(crops)
     histograms = []
     for crop in distributed_crops:
-        histogram = embedding_utils.compute_vehicle_color_histogram(crop)
+        histogram = color_utils.compute_vehicle_color_histogram(crop)
         if histogram is not None:
             histograms.append(histogram)
     return histograms
 
 
 def calculate_color_histogram_single(crop):
-    return embedding_utils.compute_vehicle_color_histogram(crop)
+    return color_utils.compute_vehicle_color_histogram(crop)
 
 
 
@@ -189,10 +191,13 @@ def run():
 
                 # if car crosses red line -> record embeddings and histograms
                 #
+                recording_crop = False
                 if f == 0:
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
-                    if not is_overlapping:
+                    width = x2 - x1
+                    if not is_overlapping and width > 90:
                         crops_per_ids_0[track_id].append(orig_frame_pair[f][y1:y2, x1:x2])
+                        recording_crop = True
 
                 # c041: compare embeddings and histograms at each frame
                 #
@@ -208,7 +213,7 @@ def run():
                         if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
                             query_color_hist = calculate_color_histogram_single(orig_frame_pair[f][y1:y2, x1:x2])
                             other_track_id = embedding_of_crossed_0_map[closest_embedding_idx]
-                            matched_color_idx, matched_color_score = embedding_utils.compare_histograms(
+                            matched_color_idx, matched_color_score = color_utils.compare_histograms(
                                 query_color_hist,
                                 histograms_of_crossed_0.get(other_track_id, []))
 
@@ -253,7 +258,7 @@ def run():
 
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
-                cv2.putText(frame_pair[f], label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[f], 2)
+                cv2.putText(frame_pair[f], label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, [255,255,255] if recording_crop else COLORS_PAIR[f], 2)
 
 
             if f == 0 and  one_or_more_cars_crossed:
