@@ -207,7 +207,7 @@ def run():
 
                                 if track_id in crossed_times_pair[1]:
                                     elapsed_time = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
-                                    label = f"{label} t:{elapsed_time}"
+                                    # label = f"{label} t:{elapsed_time:.3f}"
                                 else:
                                     elapsed_time = -1.0
 
@@ -233,9 +233,9 @@ def run():
 
                         label = (
                             f"{label} score: {round(best_matches_1[track_id]['closest_embedding_score'], 4)}"
-                            f" color: {round(best_matches_1[track_id]['matched_color_score'], 4)}"
+                            f" color: {best_matches_1[track_id]['matched_color_score']:.2f}"
                         )
-                        label = f"{label} t: {elapsed_time}"
+                        label = f"{label} t:{elapsed_time:.1f}"
 
                         crop_h, crop_w = other_crop.shape[:2]
                         box_w = max(1, x2 - x1)
