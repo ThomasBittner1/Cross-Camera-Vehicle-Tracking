@@ -67,7 +67,7 @@ def run():
     embedding_of_crossed_0_map = []
     embedding_of_crossed_0 = np.zeros(0)
 
-    best_matches_1 = {}
+    best_matches_1 = defaultdict(dict)
 
     for window_name in window_name_pair:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -214,52 +214,66 @@ def run():
                                 else:
                                     elapsed_time = -1.0
 
-                                if track_id not in best_matches_1 or best_matches_1[track_id]['closest_total_score'] < closest_total_score:
-                                    best_matches_1[track_id] = {'closest_total_score': closest_total_score,
-                                                                'closest_embedding_score': closest_embedding_score,
-                                                                'matched_color_score': matched_color_score,
-                                                                'other_crop': other_crop,
-                                                                'other_track_id': other_track_id,
-                                                                'elapsed_time': elapsed_time}
+                                do_record = False
+                                if track_id not in best_matches_1:
+                                    do_record = True
+                                else:
+                                    if other_track_id not in best_matches_1[track_id]:
+                                        do_record = True
+                                    else:
+                                        if best_matches_1[track_id][other_track_id]['closest_total_score'] < closest_total_score:
+                                            do_record = True
+                                if do_record:
+                                    best_matches_1[track_id][other_track_id] = {'closest_total_score': closest_total_score,
+                                                                                'closest_embedding_score': closest_embedding_score,
+                                                                                'matched_color_score': matched_color_score,
+                                                                                'other_crop': other_crop,
+                                                                                'other_track_id': other_track_id,
+                                                                                'elapsed_time': elapsed_time}
                                     updated_match = True
 
                     # update the elapsed time, in case the car crossed and it wasn't calculated yet
                     #
                     if not updated_match:
-                        if track_id in best_matches_1:
+                        if track_id in best_matches_1 and other_track_id in best_matches_1[track_id]:
                             if track_id in crossed_times_pair[1]:
-                                if best_matches_1[track_id]['elapsed_time'] == -1.0:
-                                    best_matches_1[track_id]['elapsed_time'] = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
+                                if best_matches_1[track_id][other_track_id]['elapsed_time'] == -1.0:
+                                    best_matches_1[track_id][other_track_id]['elapsed_time'] = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
 
                     if track_id in best_matches_1:
-                        elapsed_time = best_matches_1[track_id]['elapsed_time']
-                        other_crop = best_matches_1[track_id]['other_crop']
+                        matches = best_matches_1[track_id]
+                        sorted_other_ids = sorted(list(matches.keys()), key=lambda x: matches[x]['closest_total_score'], reverse=True)
 
-                        label = (
-                            f"{label} score: {round(best_matches_1[track_id]['closest_embedding_score'], 4)}"
-                            f" color: {best_matches_1[track_id]['matched_color_score']:.2f}"
-                        )
-                        label = f"{label} t:{elapsed_time:.1f}"
+                        for other_id in sorted_other_ids[0:1]:
+                            match = best_matches_1[track_id][other_id]
+                            elapsed_time = match['elapsed_time']
+                            other_crop = match['other_crop']
 
-                        crop_h, crop_w = other_crop.shape[:2]
-                        box_w = max(1, x2 - x1)
-                        target_w = max(1, int(round(box_w * 0.5)))
-                        scale = target_w / max(1, crop_w)
-                        target_h = max(1, int(round(crop_h * scale)))
-                        resized_crop = cv2.resize(other_crop, (target_w, target_h))
+                            label = (
+                                f"{label} score: {round(match['closest_embedding_score'], 4)}"
+                                f" color: {match['matched_color_score']:.2f}"
+                            )
+                            label = f"{label} t:{elapsed_time:.1f}"
 
-                        paste_x2 = min(frame_pair[f].shape[1], x2)
-                        paste_y2 = min(frame_pair[f].shape[0], y2)
-                        paste_x1 = max(0, paste_x2 - target_w)
-                        paste_y1 = max(0, paste_y2 - target_h)
+                            crop_h, crop_w = other_crop.shape[:2]
+                            box_w = max(1, x2 - x1)
+                            target_w = max(1, int(round(box_w * 0.5)))
+                            scale = target_w / max(1, crop_w)
+                            target_h = max(1, int(round(crop_h * scale)))
+                            resized_crop = cv2.resize(other_crop, (target_w, target_h))
 
-                        if paste_y1 < paste_y2 and paste_x1 < paste_x2:
-                            visible_crop = resized_crop[
-                                target_h - (paste_y2 - paste_y1):,
-                                target_w - (paste_x2 - paste_x1):,
-                            ]
-                            frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                        cv2.putText(frame_pair[f], f"id:{best_matches_1[track_id]['other_track_id']}", (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                            paste_x2 = min(frame_pair[f].shape[1], x2)
+                            paste_y2 = min(frame_pair[f].shape[0], y2)
+                            paste_x1 = max(0, paste_x2 - target_w)
+                            paste_y1 = max(0, paste_y2 - target_h)
+
+                            if paste_y1 < paste_y2 and paste_x1 < paste_x2:
+                                visible_crop = resized_crop[
+                                    target_h - (paste_y2 - paste_y1):,
+                                    target_w - (paste_x2 - paste_x1):,
+                                ]
+                                frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
+                            cv2.putText(frame_pair[f], f"id:{match['other_track_id']}", (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
