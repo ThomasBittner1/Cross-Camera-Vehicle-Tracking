@@ -158,6 +158,9 @@ def run():
                     if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1]):
                         one_or_more_cars_just_crossed = True
                         crossed_times_pair[f][track_id] = current_frame_index * (delay_ms / 1000.0)
+
+                        # in the left camera, we calculate their embeddings and histograms whenever they crossed the line
+                        #
                         if f == 0:
                             embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(embedder, crops_per_ids_0[track_id])
                             histograms_of_crossed_0[track_id] = color_utils.calculate_histograms_multiple(crops_per_ids_0[track_id])
