@@ -211,8 +211,12 @@ def run():
                                 else:
                                     elapsed_time = -1.0
 
-                                if track_id not in best_matches_1 or best_matches_1[track_id][0] < closest_total_score:
-                                    best_matches_1[track_id] = (closest_total_score, closest_embedding_score, matched_color_score, other_crop, elapsed_time)
+                                if track_id not in best_matches_1 or best_matches_1[track_id]['closest_total_score'] < closest_total_score:
+                                    best_matches_1[track_id] = {'closest_total_score': closest_total_score,
+                                                                'closest_embedding_score': closest_embedding_score,
+                                                                'matched_color_score': matched_color_score,
+                                                                'other_crop': other_crop,
+                                                                'elapsed_time': elapsed_time}
                                     updated_match = True
 
                     # update the elapsed time, in case the car crossed and it wasn't calculated yet
@@ -220,20 +224,18 @@ def run():
                     if not updated_match:
                         if track_id in best_matches_1:
                             if track_id in crossed_times_pair[1]:
-                                closest_total_score, closest_embedding_score, matched_color_score, other_crop, elapsed_time = best_matches_1
-                                if elapsed_time != -1.0:
-                                    elapsed_time = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
-
+                                if best_matches_1[track_id]['elapsed_time'] == -1.0:
+                                    best_matches_1[track_id]['elapsed_time'] = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
 
                     if track_id in best_matches_1:
-                        closest_total_score, closest_embedding_score, matched_color_score, other_crop, elapsed_time = best_matches_1[track_id]
+                        elapsed_time = best_matches_1[track_id]['elapsed_time']
+                        other_crop = best_matches_1[track_id]['other_crop']
 
                         label = (
-                            f"{label} score: {round(closest_embedding_score, 4)}"
-                            f" color: {round(matched_color_score, 4)}"
+                            f"{label} score: {round(best_matches_1[track_id]['closest_embedding_score'], 4)}"
+                            f" color: {round(best_matches_1[track_id]['matched_color_score'], 4)}"
                         )
-                        if elapsed_time > 0:
-                            label = f"{label} t: {elapsed_time}"
+                        label = f"{label} t: {elapsed_time}"
 
                         crop_h, crop_w = other_crop.shape[:2]
                         box_w = max(1, x2 - x1)
