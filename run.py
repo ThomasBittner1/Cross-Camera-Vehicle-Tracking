@@ -189,14 +189,14 @@ def run():
                 if track_id in crossed_times_pair[f]:
                     label = f"{label} crossed"
 
-                # if car crosses red line -> record embeddings and histograms
-                #
                 recording_crop = False
                 if f == 0:
+                    # if we have good crops -> record them
+                    #
                     is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                     width = x2 - x1
                     if not is_overlapping and width > 90:
-                        crops_per_ids_0[track_id].append(orig_frame_pair[f][y1:y2, x1:x2])
+                        crops_per_ids_0[track_id].append(geometry_utils.get_shrunk_crop(orig_frame_pair[f], x1, y1, x2, y2, scale=0.8))
                         recording_crop = True
 
                 # c041: compare embeddings and histograms at each frame

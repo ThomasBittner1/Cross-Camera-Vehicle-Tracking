@@ -46,7 +46,7 @@ def compare_histograms(query_hist, gallery_hists):
     return best_idx, best_score
 
 
-def blur_score_cv2(img):
+def blur_score(img):
     """
     Returns a blur score for an image using variance of Laplacian.
     Higher = sharper, lower = blurrier.

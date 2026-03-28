@@ -39,83 +39,21 @@ def is_box_overlapping(box, other_boxes, min_iou=0.2, box_id=None):
     return False
 
 
-class TrajectoryManager:
-    def __init__(self, max_points=30, max_lost_frames=5, on_delete_callback=None):
-        self.max_points = max_points
-        self.max_lost_frames = max_lost_frames
-        self.tracks = {}
-        self.on_delete_callback = on_delete_callback
+def get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8):
+    box_w = max(1, x2 - x1)
+    box_h = max(1, y2 - y1)
+    center_x = (x1 + x2) / 2.0
+    center_y = (y1 + y2) / 2.0
 
-    def update(self, obj_id, pos, cropped_box=None):
-        if obj_id not in self.tracks:
-            self.tracks[obj_id] = {
-                "points": deque(maxlen=self.max_points),
-                "crops": deque(maxlen=self.max_points),
-                "lost_count": 0
-            }
+    shrunk_w = max(1, int(round(box_w * scale)))
+    shrunk_h = max(1, int(round(box_h * scale)))
 
-        track = self.tracks[obj_id]
-        track["points"].append(pos)
-        track["crops"].append(cropped_box)
-        track["lost_count"] = 0
+    shrunk_x1 = max(0, int(round(center_x - shrunk_w / 2.0)))
+    shrunk_y1 = max(0, int(round(center_y - shrunk_h / 2.0)))
+    shrunk_x2 = min(frame.shape[1], shrunk_x1 + shrunk_w)
+    shrunk_y2 = min(frame.shape[0], shrunk_y1 + shrunk_h)
 
-        num_points_for_distance = 3
-        pts_count = len(track["points"])
-
-        if pts_count >= 2:
-            lookback = min(pts_count, num_points_for_distance)
-
-            start_point = track["points"][-lookback]
-            end_point = track["points"][-1]
-
-            dir = np.array(end_point, dtype='float64') - np.array(start_point, dtype='float64')
-            # Normalize to unit vector
-            mag = np.linalg.norm(dir)
-            track["mag"] = mag
-            if mag > 0:
-                track["direction"] = dir / mag
-            else:
-                track["direction"] = np.array([0.0, 0.0])
-                track['angle'] = 0.0
-
-            angle_rad = np.arctan2(dir[1], dir[0])
-            angle_deg = np.degrees(angle_rad)
-            track['angle'] = angle_deg
-
-        else:
-            track["direction"] = np.array([0.0, 0.0])
-            track["mag"] = 0.0
-            track['angle'] = 0.0
-
-    def process_garbage_collection(self, active_ids, cid):
-        # Use list() because we are deleting keys while iterating
-        all_stored_ids = list(self.tracks.keys())
-
-        for obj_id in all_stored_ids:
-            track = self.tracks[obj_id]
-
-            if obj_id not in active_ids:
-                track["lost_count"] += 1
-            else:
-                track["lost_count"] = 0
-
-            if track["lost_count"] > self.max_lost_frames:
-                if self.on_delete_callback:
-                    self.on_delete_callback(cid, obj_id, track["crops"])
-                del self.tracks[obj_id]
-
-
-    def draw(self, frame):
-        for obj_id, data in self.tracks.items():
-            points = data["points"]
-            if len(points) < 2:
-                continue
-            dir = data['direction']
-            cv2.putText(frame, f"deg:{data['angle']:.3f}",#, (mag: {data['mag']:.3f})",
-                        points[-1], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            for i in range(1, len(points)):
-                thickness = int(2 * (i / self.max_points) + 1)
-                cv2.line(frame, points[i - 1], points[i], (0, 255, 255), thickness)
+    return frame[shrunk_y1:shrunk_y2, shrunk_x1:shrunk_x2]
 
 
 
