@@ -216,6 +216,7 @@ def run():
                                                                 'closest_embedding_score': closest_embedding_score,
                                                                 'matched_color_score': matched_color_score,
                                                                 'other_crop': other_crop,
+                                                                'other_track_id': other_track_id,
                                                                 'elapsed_time': elapsed_time}
                                     updated_match = True
 
@@ -255,7 +256,7 @@ def run():
                                 target_w - (paste_x2 - paste_x1):,
                             ]
                             frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                        cv2.putText(frame_pair[f], 'xx', (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                        cv2.putText(frame_pair[f], f"id:{best_matches_1[track_id]['other_track_id']}", (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
