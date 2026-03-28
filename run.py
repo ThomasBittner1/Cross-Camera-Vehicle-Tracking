@@ -243,8 +243,11 @@ def run():
                     if track_id in best_matches_1:
                         matches = best_matches_1[track_id]
                         sorted_other_ids = sorted(list(matches.keys()), key=lambda x: matches[x]['closest_total_score'], reverse=True)
+                        print (f"{track_id}: {sorted_other_ids}")
+                        offset_y = 0
+                        preview_gap = 8
+                        for other_id in sorted_other_ids[0:3]:
 
-                        for other_id in sorted_other_ids[0:1]:
                             match = best_matches_1[track_id][other_id]
                             elapsed_time = match['elapsed_time']
                             other_crop = match['other_crop']
@@ -263,7 +266,8 @@ def run():
                             resized_crop = cv2.resize(other_crop, (target_w, target_h))
 
                             paste_x2 = min(frame_pair[f].shape[1], x2)
-                            paste_y2 = min(frame_pair[f].shape[0], y2)
+                            base_y2 = min(frame_pair[f].shape[0], y2)
+                            paste_y2 = min(frame_pair[f].shape[0], base_y2 + offset_y)
                             paste_x1 = max(0, paste_x2 - target_w)
                             paste_y1 = max(0, paste_y2 - target_h)
 
@@ -275,6 +279,7 @@ def run():
                                 frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
                             cv2.putText(frame_pair[f], f"id:{match['other_track_id']}", (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
+                            offset_y += target_h + preview_gap
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
                 cv2.putText(frame_pair[f], label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, [255,255,255] if recording_crop else COLORS_PAIR[f], 2)
