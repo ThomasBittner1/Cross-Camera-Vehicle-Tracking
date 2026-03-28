@@ -51,19 +51,6 @@ def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_m
         return vector
 
 
-def calculate_histograms_multiple(crops):
-    distributed_crops = geometry_utils.get_distributed_items(crops)
-    histograms = []
-    for crop in distributed_crops:
-        histogram = color_utils.compute_vehicle_color_histogram(crop)
-        if histogram is not None:
-            histograms.append(histogram)
-    return histograms
-
-
-def calculate_color_histogram_single(crop):
-    return color_utils.compute_vehicle_color_histogram(crop)
-
 
 
 def run():
@@ -71,12 +58,7 @@ def run():
     embedding_size = embedder.embedding_dim
     model = YOLO(r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt") # started with "yolo11m.pt"
 
-    # other_best_crops_1 = {}
-    # other_best_embedding_distance_1 = {}
-    # other_best_color_score_1 = {}
-
     prev_centers_pair = [dict() for _ in video_path_pair]
-    # crossed_ids_pair = [set(), set()]
     crossed_times_pair = [{}, {}]
     crops_per_ids_0 = defaultdict(list)
     embeddings_of_crossed_per_id_0 = {}
@@ -86,9 +68,6 @@ def run():
     embedding_of_crossed_0 = np.zeros(0)
 
     best_matches_1 = {}
-
-    best_matched_ids_1 = {}
-    best_matched_scores = {}
 
     for window_name in window_name_pair:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -136,7 +115,9 @@ def run():
             else:
                 tracks = np.empty((0, 8), dtype=np.float32)
 
-            one_or_more_cars_crossed = False
+            cv2.line(frame_pair[f], CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1], (0, 0, 255), 2)
+
+            one_or_more_cars_just_crossed = False
 
             if f == 1:
                 # append crops of right camera to their embedding histories
@@ -168,8 +149,6 @@ def run():
                 cv2.rectangle(frame_pair[f], (x1, y1), (x2, y2), COLORS_PAIR[f], 2)
                 label = f"ID {track_id}"
 
-                cv2.line(frame_pair[f], CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1], (0, 0, 255), 2)
-
                 # checking if crossed
                 #
                 cx = int((x1 + x2) / 2)
@@ -177,12 +156,11 @@ def run():
                 prev = prev_centers_pair[f].get(track_id)
                 if prev and track_id not in crossed_times_pair[f]:
                     if geometry_utils.segments_intersect(prev, (cx, cy), CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1]):
-                        # crossed_ids_pair[f].add(track_id)
-                        one_or_more_cars_crossed = True
-                        crossed_times_pair[f][track_id] = current_frame_index
+                        one_or_more_cars_just_crossed = True
+                        crossed_times_pair[f][track_id] = current_frame_index * (delay_ms / 1000.0)
                         if f == 0:
                             embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(embedder, crops_per_ids_0[track_id])
-                            histograms_of_crossed_0[track_id] = calculate_histograms_multiple(crops_per_ids_0[track_id])
+                            histograms_of_crossed_0[track_id] = color_utils.calculate_histograms_multiple(crops_per_ids_0[track_id])
 
 
                 prev_centers_pair[f][track_id] = (cx, cy)
@@ -211,7 +189,7 @@ def run():
                             closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, embedding_of_crossed_0)
 
                         if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
-                            query_color_hist = calculate_color_histogram_single(orig_frame_pair[f][y1:y2, x1:x2])
+                            query_color_hist = color_utils.compute_vehicle_color_histogram(orig_frame_pair[f][y1:y2, x1:x2])
                             other_track_id = embedding_of_crossed_0_map[closest_embedding_idx]
                             matched_color_idx, matched_color_score = color_utils.compare_histograms(
                                 query_color_hist,
@@ -226,11 +204,17 @@ def run():
 
                                 closest_total_score = closest_embedding_score * matched_color_score
 
+                                if track_id in crossed_times_pair[1]:
+                                    elapsed_time = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
+                                    label = f"{label} t:{elapsed_time}"
+                                else:
+                                    elapsed_time = -1.0
+
                                 if track_id not in best_matches_1 or best_matches_1[track_id][0] < closest_total_score:
-                                    best_matches_1[track_id] = (closest_total_score, closest_embedding_score, matched_color_score, other_crop)
+                                    best_matches_1[track_id] = (closest_total_score, closest_embedding_score, matched_color_score, other_crop, elapsed_time)
 
                     if track_id in best_matches_1:
-                        closest_total_score, closest_embedding_score, matched_color_score, other_crop = best_matches_1[track_id]
+                        closest_total_score, closest_embedding_score, matched_color_score, other_crop, elapsed_time = best_matches_1[track_id]
 
                         label = (
                             f"{label} score: {round(closest_embedding_score, 4)}"
@@ -261,7 +245,7 @@ def run():
                 cv2.putText(frame_pair[f], label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, [255,255,255] if recording_crop else COLORS_PAIR[f], 2)
 
 
-            if f == 0 and  one_or_more_cars_crossed:
+            if f == 0 and one_or_more_cars_just_crossed:
                 # get galleries of left camera:
                 #
                 embedding_of_crossed_0 = np.zeros((len(embeddings_of_crossed_per_id_0), embedding_size), dtype='float64')

@@ -2,6 +2,27 @@ import cv2
 import numpy as np
 
 
+def get_distributed_items(items, n=16):
+    if len(items) <= n:
+        return items
+
+    indices = np.round(np.linspace(0, len(items) - 1, n)).astype(int)
+    distributed_items = [items[i] for i in indices]
+    return distributed_items
+
+
+
+def calculate_histograms_multiple(crops):
+    distributed_crops = get_distributed_items(crops)
+    histograms = []
+    for crop in distributed_crops:
+        histogram = compute_vehicle_color_histogram(crop)
+        if histogram is not None:
+            histograms.append(histogram)
+    return histograms
+
+
+
 def compute_vehicle_color_histogram(crop, h_bins=24, s_bins=16):
     if crop is None or crop.size == 0:
         return None
@@ -44,6 +65,8 @@ def compare_histograms(query_hist, gallery_hists):
             best_score = similarity
 
     return best_idx, best_score
+
+
 
 
 def blur_score(img):

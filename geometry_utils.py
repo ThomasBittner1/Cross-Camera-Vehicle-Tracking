@@ -3,14 +3,6 @@ import cv2
 from collections import deque, defaultdict
 
 
-def get_distributed_items(items, n=16):
-    if len(items) <= n:
-        return items
-
-    indices = np.round(np.linspace(0, len(items) - 1, n)).astype(int)
-    distributed_items = [items[i] for i in indices]
-    return distributed_items
-
 
 def is_box_overlapping(box, other_boxes, min_iou=0.2, box_id=None):
     x1, y1, x2, y2 = map(int, box[:4])
