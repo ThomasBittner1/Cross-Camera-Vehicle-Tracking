@@ -48,6 +48,12 @@ def get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8):
     return frame[shrunk_y1:shrunk_y2, shrunk_x1:shrunk_x2]
 
 
+def point_inside_box(point, box_coords):
+    px, py = point
+    x1, y1, x2, y2 = box_coords
+    return x1 <= px <= x2 and y1 <= py <= y2
+
+
 
 def counter_clock_wise(a, b, c):
     return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])

@@ -36,8 +36,6 @@ CROSS_LINE_BOTH = [[(773, 175), (953, 256)],
 MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
                  [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]]
 
-
-
 def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_mean=True):
     if distributed_count:
         distributed_crops = general_utils.get_distributed_items(crops, n=distributed_count)
@@ -69,9 +67,17 @@ def run():
     embedding_of_crossed_0 = np.zeros(0)
 
     best_matches_1 = defaultdict(dict)
+    pending_click_pair = [None for _ in window_name_pair]
+    isolated_track_id_pair = [None for _ in window_name_pair]
 
-    for window_name in window_name_pair:
+    for f, window_name in enumerate(window_name_pair):
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+
+        def mouse_callback(event, x, y, flags, param, frame_idx=f):
+            if event == cv2.EVENT_LBUTTONDOWN:
+                pending_click_pair[frame_idx] = (x, y)
+
+        cv2.setMouseCallback(window_name, mouse_callback)
 
     cap_pair = [cv2.VideoCapture(video_path) for video_path in video_path_pair]
     for cap in cap_pair:
@@ -293,6 +299,7 @@ def run():
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
                 draw_data['boxes'].append({
+                    'track_id': track_id,
                     'coords': (x1, y1, x2, y2),
                     'label': label,
                     'label_color': [255,255,255] if recording_crop else COLORS_PAIR[f],
@@ -312,6 +319,24 @@ def run():
             frame_draw_data_pair.append(draw_data)
 
 
+        for f in [0, 1]:
+            pending_click = pending_click_pair[f]
+            if pending_click is None:
+                continue
+
+            clicked_box = None
+            for box in reversed(frame_draw_data_pair[f]['boxes']):
+                if geometry_utils.point_inside_box(pending_click, box['coords']):
+                    clicked_box = box
+                    break
+
+            if clicked_box is not None:
+                isolated_track_id_pair[f] = clicked_box['track_id']
+            elif isolated_track_id_pair[f] is not None:
+                isolated_track_id_pair[f] = None
+
+            pending_click_pair[f] = None
+
         # DRAW EVERYTHING
         #
         for f in [0, 1]:
@@ -328,7 +353,10 @@ def run():
                     frame_pair[f][other['paste_y1']:other['paste_y2'], other['paste_x1']:other['paste_x2']] = visible_crop
                 cv2.putText(frame_pair[f], f"id:{other['other_track_id']}", (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
+            isolated_track_id = isolated_track_id_pair[f]
             for box in draw_data['boxes']:
+                if isolated_track_id is not None and box['track_id'] != isolated_track_id:
+                    continue
                 x1, y1, x2, y2 = box['coords']
                 cv2.rectangle(frame_pair[f], (x1, y1), (x2, y2), box['box_color'], 2)
                 cv2.putText(frame_pair[f], box['label'], (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box['label_color'], 2)
