@@ -157,6 +157,18 @@ def run():
                 persist=True,
             )[0]
 
+            predicted_ids = (
+                pred_result.boxes.cls.int().cpu().tolist()
+                if pred_result.boxes is not None and len(pred_result.boxes) > 0
+                else []
+            )
+            ocsort_track_ids = [int(track[4]) for track in ocsort_tracks]
+            print(
+                f"Frame {current_frame_index}: "
+                f"predicted_ids={predicted_ids} "
+                f"ocsort_track_ids={ocsort_track_ids}"
+            )
+
             draw_detection_boxes(draw_frame_ocsort, pred_result, PRED_COLOR)
             draw_ocsort_tracks(draw_frame_ocsort, ocsort_tracks, TRACK_COLOR)
             draw_legend(draw_frame_ocsort)
