@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import torchvision.transforms as T
-
+import cv2
 
 def l2_normalize(x, axis=1, eps=1e-10):
     x = np.asarray(x, dtype=np.float32)

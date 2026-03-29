@@ -8,6 +8,7 @@ import geometry_utils
 from boxmot import OcSort
 import time
 from collections import defaultdict
+import general_utils
 
 import importlib
 importlib.reload(geometry_utils)
@@ -39,7 +40,7 @@ MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1,
 
 def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_mean=True):
     if distributed_count:
-        distributed_crops = geometry_utils.get_distributed_items(crops, n=distributed_count)
+        distributed_crops = general_utils.get_distributed_items(crops, n=distributed_count)
     else:
         distributed_crops = crops
 
@@ -200,7 +201,7 @@ def run():
                                 histograms_of_crossed_0.get(other_track_id, []))
 
                             if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
-                                distributed_crops = geometry_utils.get_distributed_items(crops_per_ids_0[other_track_id])
+                                distributed_crops = general_utils.get_distributed_items(crops_per_ids_0[other_track_id])
                                 if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
                                     other_crop = distributed_crops[matched_color_idx]
                                 elif distributed_crops:
@@ -243,7 +244,6 @@ def run():
                     if track_id in best_matches_1:
                         matches = best_matches_1[track_id]
                         sorted_other_ids = sorted(list(matches.keys()), key=lambda x: matches[x]['closest_total_score'], reverse=True)
-                        print (f"{track_id}: {sorted_other_ids}")
                         offset_y = 0
                         preview_gap = 8
                         for other_id in sorted_other_ids[0:3]:
