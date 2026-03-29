@@ -1,8 +1,10 @@
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
+from pathlib import Path
 
-from boxmot import OcSort
+from boxmot import BotSort
 
 
 START_FRAME_INDEX = 950
@@ -34,7 +36,7 @@ def draw_detection_boxes(frame, result, color, thickness, transparency):
     cv2.addWeighted(overlay, transparency, frame, 1.0 - transparency, 0, frame)
 
 
-def draw_ocsort_tracks(frame, tracks, color, thickness, transparency):
+def draw_boxmot_tracks(frame, tracks, color, thickness, transparency):
     overlay = frame.copy()
     for track in tracks:
         x1, y1, x2, y2 = map(int, track[:4])
@@ -71,9 +73,24 @@ def draw_frame_footer(frame, frame_index, frame_height):
 
 
 def run():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_predict = YOLO(MODEL_PATH)
     model_track = YOLO(MODEL_PATH)
-    tracker = OcSort()
+    tracker = BotSort(
+        reid_weights=Path(MODEL_PATH),
+        device=device,
+        half=False,
+        with_reid=False,
+        track_high_thresh=0.25,
+        track_low_thresh=0.1,
+        new_track_thresh=0.25,
+        track_buffer=30,
+        match_thresh=0.8,
+        proximity_thresh=0.5,
+        appearance_thresh=0.8,
+        cmc_method="sof",
+        frame_rate=30,
+    )
 
     cap = cv2.VideoCapture(VIDEO_PATH)
     cap.set(cv2.CAP_PROP_POS_FRAMES, START_FRAME_INDEX)
@@ -111,12 +128,12 @@ def run():
 
             if pred_result.boxes is not None and len(pred_result.boxes) > 0:
                 boxes = pred_result.boxes.xyxy.cpu().numpy()
-                confs = np.ones((len(boxes), 1), dtype=np.float32)
+                confs = pred_result.boxes.conf.cpu().numpy().reshape(-1, 1)
                 clss = pred_result.boxes.cls.cpu().numpy().reshape(-1, 1)
                 detections = np.hstack((boxes, confs, clss)).astype(np.float32)
-                ocsort_tracks = tracker.update(detections, frame)
+                boxmot_tracks = tracker.update(detections, frame)
             else:
-                ocsort_tracks = np.empty((0, 8), dtype=np.float32)
+                boxmot_tracks = np.empty((0, 8), dtype=np.float32)
 
             ultra_result = model_track.track(
                 source=masked_frame,
@@ -130,16 +147,16 @@ def run():
                 if pred_result.boxes is not None and len(pred_result.boxes) > 0
                 else []
             )
-            ocsort_track_ids = [int(track[4]) for track in ocsort_tracks]
+            boxmot_track_ids = [int(track[4]) for track in boxmot_tracks]
             print(
                 f"Frame {current_frame_index}: "
                 f"predicted_ids={predicted_ids} "
-                f"ocsort_track_ids={ocsort_track_ids}"
+                f"boxmot_track_ids={boxmot_track_ids}"
             )
 
             draw_ultralytics_tracks(draw_frame, ultra_result, (255, 0, 0), thickness=8, transparency=0.5)
             draw_detection_boxes(draw_frame, pred_result, (0, 0, 255), thickness=4, transparency=1.0)
-            draw_ocsort_tracks(draw_frame, ocsort_tracks, (0, 255, 0), thickness=2, transparency=1.0)
+            draw_boxmot_tracks(draw_frame, boxmot_tracks, (0, 255, 0), thickness=2, transparency=1.0)
             draw_frame_footer(draw_frame, current_frame_index, frame_height)
 
             if step_one_frame:
