@@ -109,7 +109,7 @@ def run():
         for f in [0,1]:
             draw_data = {
                 'boxes': [],
-                'previews': [],
+                'others': [],
                 'line': CROSS_LINE_BOTH[f],
                 'frame_text': f"Frame {current_frame_index}",
             }
@@ -252,7 +252,7 @@ def run():
                         matches = best_matches_1[track_id]
                         sorted_other_ids = sorted(list(matches.keys()), key=lambda x: matches[x]['closest_total_score'], reverse=True)
                         offset_y = 0
-                        preview_gap = 8
+                        other_gap = 8
                         for other_id in sorted_other_ids[0:3]:
 
                             match = best_matches_1[track_id][other_id]
@@ -278,7 +278,7 @@ def run():
                             paste_x1 = max(0, paste_x2 - target_w)
                             paste_y1 = max(0, paste_y2 - target_h)
 
-                            draw_data['previews'].append({
+                            draw_data['others'].append({
                                 'crop': other_crop,
                                 'target_w': target_w,
                                 'target_h': target_h,
@@ -289,7 +289,7 @@ def run():
                                 'other_track_id': match['other_track_id'],
                             })
 
-                            offset_y += target_h + preview_gap
+                            offset_y += target_h + other_gap
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
                 draw_data['boxes'].append({
@@ -318,15 +318,15 @@ def run():
             draw_data = frame_draw_data_pair[f]
             cv2.line(frame_pair[f], draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
 
-            for preview in draw_data['previews']:
-                resized_crop = cv2.resize(preview['crop'], (preview['target_w'], preview['target_h']))
-                if preview['paste_y1'] < preview['paste_y2'] and preview['paste_x1'] < preview['paste_x2']:
+            for other in draw_data['others']:
+                resized_crop = cv2.resize(other['crop'], (other['target_w'], other['target_h']))
+                if other['paste_y1'] < other['paste_y2'] and other['paste_x1'] < other['paste_x2']:
                     visible_crop = resized_crop[
-                        preview['target_h'] - (preview['paste_y2'] - preview['paste_y1']):,
-                        preview['target_w'] - (preview['paste_x2'] - preview['paste_x1']):,
+                        other['target_h'] - (other['paste_y2'] - other['paste_y1']):,
+                        other['target_w'] - (other['paste_x2'] - other['paste_x1']):,
                     ]
-                    frame_pair[f][preview['paste_y1']:preview['paste_y2'], preview['paste_x1']:preview['paste_x2']] = visible_crop
-                cv2.putText(frame_pair[f], f"id:{preview['other_track_id']}", (preview['paste_x1'], max(20, preview['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                    frame_pair[f][other['paste_y1']:other['paste_y2'], other['paste_x1']:other['paste_x2']] = visible_crop
+                cv2.putText(frame_pair[f], f"id:{other['other_track_id']}", (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
             for box in draw_data['boxes']:
                 x1, y1, x2, y2 = box['coords']
