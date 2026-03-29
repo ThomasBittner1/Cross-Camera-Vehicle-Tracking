@@ -8,13 +8,15 @@ from boxmot import OcSort
 START_FRAME_INDEX = 950
 VIDEO_PATH = r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi"
 MODEL_PATH = r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt"
-WINDOW_NAME = "tracker_compare_c042"
+WINDOW_NAME_OCSORT = "tracker_compare_c042_ocsort"
+WINDOW_NAME_ULTRA = "tracker_compare_c042_ultralytics"
 CONF_THRESHOLD = 0.02
 MASK_PTS = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
 
 PRED_COLOR = (255, 0, 0)
 TRACK_COLOR = (0, 0, 255)
 ULTRA_TRACK_COLOR = (0, 255, 0)
+PRED_THICKNESS = 4
 
 
 def draw_detection_boxes(frame, result, color):
@@ -24,7 +26,7 @@ def draw_detection_boxes(frame, result, color):
     boxes = result.boxes.xyxy.cpu().numpy().astype(int)
     confs = result.boxes.conf.cpu().numpy()
     for i, (x1, y1, x2, y2) in enumerate(boxes):
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, PRED_THICKNESS)
         cv2.putText(
             frame,
             f"pred {confs[i]:.2f}",
@@ -86,6 +88,18 @@ def draw_legend(frame):
         y += 28
 
 
+def draw_frame_footer(frame, frame_index, frame_height):
+    cv2.putText(
+        frame,
+        f"Frame {frame_index}",
+        (20, frame_height - 20),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 255, 255),
+        2,
+    )
+
+
 def run():
     model_predict = YOLO(MODEL_PATH)
     model_track = YOLO(MODEL_PATH)
@@ -103,18 +117,23 @@ def run():
     pts = np.array(MASK_PTS, dtype=np.int32)
     cv2.fillPoly(mask, [pts], (255, 255, 255))
 
-    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+    cv2.namedWindow(WINDOW_NAME_OCSORT, cv2.WINDOW_NORMAL)
+    cv2.namedWindow(WINDOW_NAME_ULTRA, cv2.WINDOW_NORMAL)
     paused = False
+    step_one_frame = False
     current_frame_index = START_FRAME_INDEX
 
     while True:
-        if not paused:
+        should_process_frame = (not paused) or step_one_frame
+
+        if should_process_frame:
             ret, frame = cap.read()
             if not ret:
                 break
 
             masked_frame = cv2.bitwise_and(frame, mask)
-            draw_frame = frame.copy()
+            draw_frame_ocsort = frame.copy()
+            draw_frame_ultra = frame.copy()
 
             pred_result = model_predict.predict(
                 source=masked_frame,
@@ -138,30 +157,32 @@ def run():
                 persist=True,
             )[0]
 
-            draw_detection_boxes(draw_frame, pred_result, PRED_COLOR)
-            draw_ocsort_tracks(draw_frame, ocsort_tracks, TRACK_COLOR)
-            draw_ultralytics_tracks(draw_frame, ultra_result, ULTRA_TRACK_COLOR)
-            draw_legend(draw_frame)
-            cv2.putText(
-                draw_frame,
-                f"Frame {current_frame_index}",
-                (20, frame_height - 20),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 255),
-                2,
-            )
+            draw_detection_boxes(draw_frame_ocsort, pred_result, PRED_COLOR)
+            draw_ocsort_tracks(draw_frame_ocsort, ocsort_tracks, TRACK_COLOR)
+            draw_legend(draw_frame_ocsort)
+            draw_frame_footer(draw_frame_ocsort, current_frame_index, frame_height)
 
-        cv2.imshow(WINDOW_NAME, draw_frame)
-        key = cv2.waitKey(0 if paused else delay_ms) & 0xFF
+            draw_ultralytics_tracks(draw_frame_ultra, ultra_result, ULTRA_TRACK_COLOR)
+            draw_legend(draw_frame_ultra)
+            draw_frame_footer(draw_frame_ultra, current_frame_index, frame_height)
 
-        if key == ord("q"):
+            if step_one_frame:
+                step_one_frame = False
+
+        cv2.imshow(WINDOW_NAME_OCSORT, draw_frame_ocsort)
+        cv2.imshow(WINDOW_NAME_ULTRA, draw_frame_ultra)
+        key = cv2.waitKeyEx(30 if paused else delay_ms)
+
+        if key in (ord("q"), ord("Q")):
             break
         if key == ord(" "):
             paused = not paused
             continue
+        if paused and key == 2555904:
+            step_one_frame = True
+            continue
 
-        if not paused:
+        if should_process_frame:
             current_frame_index += 1
 
     cap.release()
