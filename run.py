@@ -21,6 +21,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 COLORS_PAIR = [(255, 0, 0), (0, 255, 0)]
 EMBEDDING_SIMILARITY_THRESHOLD = 0.3
 COLOR_SIMILARITY_THRESHOLD = 0.3
+NUM_SHOW_POSSIBLE_OTHERS = 5
+
 
 START_FRAME_INDEX = 950
 window_name_pair = ['c042', 'c041']
@@ -262,7 +264,7 @@ def run():
                             sorted_other_ids = sorted(list(matches.keys()), key=lambda x: matches[x]['closest_total_score'], reverse=True)
                             offset_y = 0
                             other_gap = 8
-                            for other_id in sorted_other_ids[0:3]:
+                            for other_id in sorted_other_ids[0:NUM_SHOW_POSSIBLE_OTHERS]:
 
                                 match = best_matches_1[track_id][other_id]
                                 elapsed_time = match['elapsed_time']
