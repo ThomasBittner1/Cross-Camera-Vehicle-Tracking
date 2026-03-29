@@ -269,12 +269,12 @@ def run():
                                 match = best_matches_1[track_id][other_id]
                                 elapsed_time = match['elapsed_time']
                                 other_crop = match['other_crop']
-
-                                label = (
-                                    f"{label} score: {round(match['closest_embedding_score'], 4)}"
-                                    f" color: {match['matched_color_score']:.2f}"
+                                other_label = (
+                                    f"id:{match['other_track_id']}"
+                                    f" score:{round(match['closest_embedding_score'], 4)}"
+                                    f" color:{match['matched_color_score']:.2f}"
+                                    f" t:{elapsed_time:.1f}"
                                 )
-                                label = f"{label} t:{elapsed_time:.1f}"
 
                                 crop_h, crop_w = other_crop.shape[:2]
                                 box_w = max(1, x2 - x1)
@@ -299,6 +299,7 @@ def run():
                                     'paste_x2': paste_x2,
                                     'paste_y2': paste_y2,
                                     'other_track_id': match['other_track_id'],
+                                    'label': other_label,
                                 })
 
                                 offset_y += target_h + other_gap
@@ -367,6 +368,13 @@ def run():
             isolated_track_id = isolated_track_id_pair[f]
             cv2.line(draw_frame, draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
 
+            for box in draw_data['boxes']:
+                if isolated_track_id is not None and box['track_id'] != isolated_track_id:
+                    continue
+                x1, y1, x2, y2 = box['coords']
+                cv2.rectangle(draw_frame, (x1, y1), (x2, y2), box['box_color'], 2)
+                cv2.putText(draw_frame, box['label'], (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box['label_color'], 2)
+
             for other in draw_data['others']:
                 if isolated_track_id is not None and other['track_id'] != isolated_track_id:
                     continue
@@ -377,14 +385,8 @@ def run():
                         other['target_w'] - (other['paste_x2'] - other['paste_x1']):,
                     ]
                     draw_frame[other['paste_y1']:other['paste_y2'], other['paste_x1']:other['paste_x2']] = visible_crop
-                cv2.putText(draw_frame, f"id:{other['other_track_id']}", (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                cv2.putText(draw_frame, other['label'], (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
-            for box in draw_data['boxes']:
-                if isolated_track_id is not None and box['track_id'] != isolated_track_id:
-                    continue
-                x1, y1, x2, y2 = box['coords']
-                cv2.rectangle(draw_frame, (x1, y1), (x2, y2), box['box_color'], 2)
-                cv2.putText(draw_frame, box['label'], (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box['label_color'], 2)
 
             cv2.putText(draw_frame, draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
             cv2.imshow(window_name_pair[f], draw_frame)
