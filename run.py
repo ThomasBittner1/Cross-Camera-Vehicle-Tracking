@@ -115,7 +115,7 @@ def run():
             if not all(ret_pair):
                 break
 
-            result_pair = model.predict(source=masked_frame_pair, verbose=False, conf=0.5)
+            result_pair = model.predict(source=masked_frame_pair, verbose=False, conf=0.02)
 
             for f in [0,1]:
                 draw_data = {
