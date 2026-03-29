@@ -99,7 +99,7 @@ def run():
         mask_pair.append(mask)
 
     frame_draw_data_pair = [None, None]
-
+    draw_frame = np.empty((frame_height, frame_width, 3), dtype=np.uint8)
     while True:
         loop_start = time.perf_counter()
 
@@ -129,7 +129,7 @@ def run():
                     clss = result_pair[f].boxes.cls.cpu().numpy().reshape(-1, 1)
 
                     detections = np.hstack((boxes, confs, clss)).astype(np.float32)
-                    tracks = tracker_pair[f].update(detections, frame_pair[f])
+                    tracks = tracker_pair[f].update(detections, orig_frame_pair[f])
                 else:
                     tracks = np.empty((0, 8), dtype=np.float32)
 
@@ -280,7 +280,7 @@ def run():
                                 scale = target_w / max(1, crop_w)
                                 target_h = max(1, int(round(crop_h * scale)))
 
-                                frame_h, frame_w = frame_pair[f].shape[:2]
+                                frame_h, frame_w = orig_frame_pair[f].shape[:2]
                                 paste_x2 = min(frame_w, x2)
                                 base_y2 = min(frame_h, y2)
                                 paste_y2 = min(frame_h, base_y2 + offset_y)
@@ -358,8 +358,10 @@ def run():
         # DRAW EVERYTHING
         #
         for f in [0, 1]:
+            draw_frame[:] = orig_frame_pair[f][:]
+
             draw_data = frame_draw_data_pair[f]
-            cv2.line(frame_pair[f], draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
+            cv2.line(draw_frame, draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
 
             for other in draw_data['others']:
                 resized_crop = cv2.resize(other['crop'], (other['target_w'], other['target_h']))
@@ -368,19 +370,19 @@ def run():
                         other['target_h'] - (other['paste_y2'] - other['paste_y1']):,
                         other['target_w'] - (other['paste_x2'] - other['paste_x1']):,
                     ]
-                    frame_pair[f][other['paste_y1']:other['paste_y2'], other['paste_x1']:other['paste_x2']] = visible_crop
-                cv2.putText(frame_pair[f], f"id:{other['other_track_id']}", (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                    draw_frame[other['paste_y1']:other['paste_y2'], other['paste_x1']:other['paste_x2']] = visible_crop
+                cv2.putText(draw_frame, f"id:{other['other_track_id']}", (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
             isolated_track_id = isolated_track_id_pair[f]
             for box in draw_data['boxes']:
                 if isolated_track_id is not None and box['track_id'] != isolated_track_id:
                     continue
                 x1, y1, x2, y2 = box['coords']
-                cv2.rectangle(frame_pair[f], (x1, y1), (x2, y2), box['box_color'], 2)
-                cv2.putText(frame_pair[f], box['label'], (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box['label_color'], 2)
+                cv2.rectangle(draw_frame, (x1, y1), (x2, y2), box['box_color'], 2)
+                cv2.putText(draw_frame, box['label'], (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box['label_color'], 2)
 
-            cv2.putText(frame_pair[f], draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-            cv2.imshow(window_name_pair[f], frame_pair[f])
+            cv2.putText(draw_frame, draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            cv2.imshow(window_name_pair[f], draw_frame)
 
 
     for cap in cap_pair:
