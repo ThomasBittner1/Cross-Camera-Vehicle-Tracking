@@ -290,6 +290,7 @@ def run():
                                 paste_y1 = max(0, paste_y2 - target_h)
 
                                 draw_data['others'].append({
+                                    'track_id': track_id,
                                     'crop': other_crop,
                                     'target_w': target_w,
                                     'target_h': target_h,
@@ -363,9 +364,12 @@ def run():
             draw_frame[:] = orig_frame_pair[f][:]
 
             draw_data = frame_draw_data_pair[f]
+            isolated_track_id = isolated_track_id_pair[f]
             cv2.line(draw_frame, draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
 
             for other in draw_data['others']:
+                if isolated_track_id is not None and other['track_id'] != isolated_track_id:
+                    continue
                 resized_crop = cv2.resize(other['crop'], (other['target_w'], other['target_h']))
                 if other['paste_y1'] < other['paste_y2'] and other['paste_x1'] < other['paste_x2']:
                     visible_crop = resized_crop[
@@ -375,7 +379,6 @@ def run():
                     draw_frame[other['paste_y1']:other['paste_y2'], other['paste_x1']:other['paste_x2']] = visible_crop
                 cv2.putText(draw_frame, f"id:{other['other_track_id']}", (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
-            isolated_track_id = isolated_track_id_pair[f]
             for box in draw_data['boxes']:
                 if isolated_track_id is not None and box['track_id'] != isolated_track_id:
                     continue
