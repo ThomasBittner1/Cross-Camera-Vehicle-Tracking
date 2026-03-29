@@ -104,8 +104,16 @@ def run():
             break
 
         result_pair = model.predict(source=masked_frame_pair, verbose=False, conf=0.5)
+        frame_draw_data_pair = []
 
         for f in [0,1]:
+            draw_data = {
+                'boxes': [],
+                'previews': [],
+                'line': CROSS_LINE_BOTH[f],
+                'frame_text': f"Frame {current_frame_index}",
+            }
+
             if result_pair[f].boxes is not None and len(result_pair[f].boxes) > 0:
                 boxes = result_pair[f].boxes.xyxy.cpu().numpy()
                 confs = result_pair[f].boxes.conf.cpu().numpy().reshape(-1, 1)
@@ -115,8 +123,6 @@ def run():
                 tracks = tracker_pair[f].update(detections, frame_pair[f])
             else:
                 tracks = np.empty((0, 8), dtype=np.float32)
-
-            cv2.line(frame_pair[f], CROSS_LINE_BOTH[f][0], CROSS_LINE_BOTH[f][1], (0, 0, 255), 2)
 
             one_or_more_cars_just_crossed = False
 
@@ -147,7 +153,6 @@ def run():
                 x1, y1, x2, y2 = map(int, track[:4])
                 track_id = int(track[4])
 
-                cv2.rectangle(frame_pair[f], (x1, y1), (x2, y2), COLORS_PAIR[f], 2)
                 label = f"ID {track_id}"
 
                 # checking if crossed
@@ -185,6 +190,7 @@ def run():
                 #
                 elif f == 1:
                     updated_match = False
+                    other_track_id = None
                     if not all_overlapping_1[t]:
                         query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
 
@@ -201,6 +207,7 @@ def run():
                                 histograms_of_crossed_0.get(other_track_id, []))
 
                             if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
+                                other_crop = None
                                 distributed_crops = general_utils.get_distributed_items(crops_per_ids_0[other_track_id])
                                 if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
                                     other_crop = distributed_crops[matched_color_idx]
@@ -263,26 +270,34 @@ def run():
                             target_w = max(1, int(round(box_w * 0.5)))
                             scale = target_w / max(1, crop_w)
                             target_h = max(1, int(round(crop_h * scale)))
-                            resized_crop = cv2.resize(other_crop, (target_w, target_h))
 
-                            paste_x2 = min(frame_pair[f].shape[1], x2)
-                            base_y2 = min(frame_pair[f].shape[0], y2)
-                            paste_y2 = min(frame_pair[f].shape[0], base_y2 + offset_y)
+                            frame_h, frame_w = frame_pair[f].shape[:2]
+                            paste_x2 = min(frame_w, x2)
+                            base_y2 = min(frame_h, y2)
+                            paste_y2 = min(frame_h, base_y2 + offset_y)
                             paste_x1 = max(0, paste_x2 - target_w)
                             paste_y1 = max(0, paste_y2 - target_h)
 
-                            if paste_y1 < paste_y2 and paste_x1 < paste_x2:
-                                visible_crop = resized_crop[
-                                    target_h - (paste_y2 - paste_y1):,
-                                    target_w - (paste_x2 - paste_x1):,
-                                ]
-                                frame_pair[f][paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                            cv2.putText(frame_pair[f], f"id:{match['other_track_id']}", (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                            draw_data['previews'].append({
+                                'crop': other_crop,
+                                'target_w': target_w,
+                                'target_h': target_h,
+                                'paste_x1': paste_x1,
+                                'paste_y1': paste_y1,
+                                'paste_x2': paste_x2,
+                                'paste_y2': paste_y2,
+                                'other_track_id': match['other_track_id'],
+                            })
 
                             offset_y += target_h + preview_gap
                 else:
                     raise Exception(f"unknown window name: {window_name_pair[f]}")
-                cv2.putText(frame_pair[f], label, (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, [255,255,255] if recording_crop else COLORS_PAIR[f], 2)
+                draw_data['boxes'].append({
+                    'coords': (x1, y1, x2, y2),
+                    'label': label,
+                    'label_color': [255,255,255] if recording_crop else COLORS_PAIR[f],
+                    'box_color': COLORS_PAIR[f],
+                })
 
 
             if f == 0 and one_or_more_cars_just_crossed:
@@ -294,8 +309,31 @@ def run():
                     embedding_of_crossed_0[t] = embeddings_of_crossed_per_id_0[other_track_id]
                     embedding_of_crossed_0_map.append(other_track_id)
 
-            cv2.putText(frame_pair[f], f"Frame {current_frame_index}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            frame_draw_data_pair.append(draw_data)
 
+
+        # DRAW EVERYTHING
+        #
+        for f in [0, 1]:
+            draw_data = frame_draw_data_pair[f]
+            cv2.line(frame_pair[f], draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
+
+            for preview in draw_data['previews']:
+                resized_crop = cv2.resize(preview['crop'], (preview['target_w'], preview['target_h']))
+                if preview['paste_y1'] < preview['paste_y2'] and preview['paste_x1'] < preview['paste_x2']:
+                    visible_crop = resized_crop[
+                        preview['target_h'] - (preview['paste_y2'] - preview['paste_y1']):,
+                        preview['target_w'] - (preview['paste_x2'] - preview['paste_x1']):,
+                    ]
+                    frame_pair[f][preview['paste_y1']:preview['paste_y2'], preview['paste_x1']:preview['paste_x2']] = visible_crop
+                cv2.putText(frame_pair[f], f"id:{preview['other_track_id']}", (preview['paste_x1'], max(20, preview['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+
+            for box in draw_data['boxes']:
+                x1, y1, x2, y2 = box['coords']
+                cv2.rectangle(frame_pair[f], (x1, y1), (x2, y2), box['box_color'], 2)
+                cv2.putText(frame_pair[f], box['label'], (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box['label_color'], 2)
+
+            cv2.putText(frame_pair[f], draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
             cv2.imshow(window_name_pair[f], frame_pair[f])
 
         if paused:
