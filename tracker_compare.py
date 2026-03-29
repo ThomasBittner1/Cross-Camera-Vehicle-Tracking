@@ -13,8 +13,8 @@ CONF_THRESHOLD = 0.02
 MASK_PTS = [(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)]
 
 PRED_COLOR = (255, 0, 0)
-TRACK_COLOR = (0, 255, 0)
-ULTRA_TRACK_COLOR = (0, 0, 255)
+TRACK_COLOR = (0, 0, 255)
+ULTRA_TRACK_COLOR = (0, 255, 0)
 
 
 def draw_detection_boxes(frame, result, color):
