@@ -5,10 +5,11 @@ import numpy as np
 import embedding_utils
 import color_utils
 import geometry_utils
-from boxmot import OcSort
+from boxmot import BotSort
 import time
 from collections import defaultdict
 import general_utils
+from pathlib import Path
 
 import importlib
 importlib.reload(geometry_utils)
@@ -22,6 +23,7 @@ COLORS_PAIR = [(255, 0, 0), (0, 255, 0)]
 EMBEDDING_SIMILARITY_THRESHOLD = 0.3
 COLOR_SIMILARITY_THRESHOLD = 0.3
 NUM_SHOW_POSSIBLE_OTHERS = 5
+MODEL_PATH = r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt"
 
 
 START_FRAME_INDEX = 950
@@ -40,7 +42,7 @@ MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1,
 
 def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_mean=True):
     if distributed_count:
-        distributed_crops = general_utils.get_distributed_items(crops, n=distributed_count)
+        distributed_crops = general_utils.get_distributed_items(crops, n=distributed_count) # suddenly crops are empty
     else:
         distributed_crops = crops
 
@@ -61,7 +63,8 @@ def run():
 
     prev_centers_pair = [dict() for _ in video_path_pair]
     crossed_times_pair = [{}, {}]
-    crops_per_ids_0 = defaultdict(list)
+    good_crops_per_ids_0 = defaultdict(list)
+    bad_crops_per_ids_0 = defaultdict(list)
     embeddings_of_crossed_per_id_0 = {}
     histograms_of_crossed_0 = {}
     embedding_histories_1 = defaultdict(list)
@@ -88,7 +91,21 @@ def run():
     delay_ms = max(1, int(round(1000.0 / fps)))
     paused = False
 
-    tracker_pair = [OcSort() for _ in video_path_pair]
+    tracker_pair = [BotSort(reid_weights=Path(MODEL_PATH),
+                            device=device,
+                            half=False,
+                            with_reid=False,
+                            track_high_thresh=0.25,
+                            track_low_thresh=0.1,
+                            new_track_thresh=0.25,
+                            track_buffer=30,
+                            match_thresh=0.8,
+                            proximity_thresh=0.5,
+                            appearance_thresh=0.8,
+                            cmc_method="sof",
+                            frame_rate=30)
+                     for _ in video_path_pair]
+
     current_frame_index = START_FRAME_INDEX
 
     mask_pair = []
@@ -179,23 +196,26 @@ def run():
                             # in the left camera, we calculate their embeddings and histograms whenever they crossed the line
                             #
                             if f == 0:
-                                embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(embedder, crops_per_ids_0[track_id])
-                                histograms_of_crossed_0[track_id] = color_utils.calculate_histograms_multiple(crops_per_ids_0[track_id])
+                                crops = good_crops_per_ids_0[track_id] if len(good_crops_per_ids_0[track_id]) else bad_crops_per_ids_0[track_id]
+                                embeddings_of_crossed_per_id_0[track_id] = calculate_embedding_multiple(embedder, crops)
+                                histograms_of_crossed_0[track_id] = color_utils.calculate_histograms_multiple(crops)
 
 
                     prev_centers_pair[f][track_id] = (cx, cy)
                     if track_id in crossed_times_pair[f]:
                         label = f"{label} crossed"
 
-                    recording_crop = False
+                    is_good_crop = False
                     if f == 0:
                         # if we have good crops -> record them
                         #
                         is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                         width = x2 - x1
                         if not is_overlapping and width > 90:
-                            crops_per_ids_0[track_id].append(geometry_utils.get_shrunk_crop(orig_frame_pair[f], x1, y1, x2, y2, scale=0.8))
-                            recording_crop = True
+                            good_crops_per_ids_0[track_id].append(geometry_utils.get_shrunk_crop(orig_frame_pair[f], x1, y1, x2, y2, scale=0.8))
+                            is_good_crop = True
+                        else:
+                            bad_crops_per_ids_0[track_id].append(geometry_utils.get_shrunk_crop(orig_frame_pair[f], x1, y1, x2, y2, scale=0.8))
 
                     # c041: compare embeddings and histograms at each frame
                     #
@@ -219,7 +239,9 @@ def run():
 
                                 if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
                                     other_crop = None
-                                    distributed_crops = general_utils.get_distributed_items(crops_per_ids_0[other_track_id])
+                                    distributed_crops = general_utils.get_distributed_items(good_crops_per_ids_0[other_track_id]
+                                                                                            if len(good_crops_per_ids_0[other_track_id])
+                                                                                            else bad_crops_per_ids_0[other_track_id] )
                                     if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
                                         other_crop = distributed_crops[matched_color_idx]
                                     elif distributed_crops:
@@ -309,7 +331,7 @@ def run():
                         'track_id': track_id,
                         'coords': (x1, y1, x2, y2),
                         'label': label,
-                        'label_color': [255,255,255] if recording_crop else COLORS_PAIR[f],
+                        'label_color': [255,255,255] if is_good_crop else COLORS_PAIR[f],
                         'box_color': COLORS_PAIR[f],
                     })
 
