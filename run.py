@@ -40,6 +40,10 @@ CROSS_LINE_BOTH = [[(773, 175), (953, 256)],
 MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
                  [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]]
 
+MASK_PTS_BOT_1 = [(657, 948), (1083, 286), (1278, 419), (1277, 956)]
+MASK_PTS_TOP_1 = [(3, 252), (589, 76), (586, 1), (1, 2)]
+BEGIN_CHECK_FRAMES = 3
+
 def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_mean=True):
     if distributed_count:
         distributed_crops = general_utils.get_distributed_items(crops, n=distributed_count) # suddenly crops are empty
