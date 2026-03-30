@@ -176,13 +176,16 @@ def run():
                     non_overlapping_track_ids_1 = []
                     all_overlapping_1 = []
                     for t,track in enumerate(tracks):
-                        x1, y1, x2, y2 = map(int, track[:4])
                         track_id = int(track[4])
-                        is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
-                        if not is_overlapping:
-                            non_overlapping_track_ids_1.append(track_id)
-                            non_overlapping_crops_1.append(orig_frame_pair[f][y1:y2, x1:x2])
-                        all_overlapping_1.append(is_overlapping)
+                        if is_important_1[track_id]:
+                            x1, y1, x2, y2 = map(int, track[:4])
+                            is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
+                            if not is_overlapping:
+                                non_overlapping_track_ids_1.append(track_id)
+                                non_overlapping_crops_1.append(orig_frame_pair[f][y1:y2, x1:x2])
+                            all_overlapping_1.append(is_overlapping)
+                        else:
+                            all_overlapping_1.append(None)
 
                     combined_current_embeddings_1 = calculate_embedding_multiple(embedder, non_overlapping_crops_1, distributed_count=None, return_mean=False)
                     if non_overlapping_crops_1:
@@ -193,8 +196,11 @@ def run():
 
                 are_overlapping = []
                 for t, track in enumerate(tracks):
-                    x1, y1, x2, y2 = map(int, track[:4])
                     track_id = int(track[4])
+                    if f == 1 and not is_important_1[track_id]:
+                        continue
+
+                    x1, y1, x2, y2 = map(int, track[:4])
 
                     label = f"ID {track_id}"
 
