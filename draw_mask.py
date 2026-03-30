@@ -21,12 +21,18 @@ def draw_polygon(event, x, y, flags, param):
 
 def main():
     global points
-    # Update this path to an image you just extracted!
-    image_path = r"C:\ComputerVision\car_multicamera\dataset\images_with_subfolders\c041\c041_0000.jpg"
-    img = cv2.imread(image_path)
+    video_path = r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi"
+    cap = cv2.VideoCapture(video_path)
 
-    if img is None:
-        print("Error: Could not load image. Check the path.")
+    if not cap.isOpened():
+        print("Error: Could not open video. Check the path.")
+        return
+
+    ret, img = cap.read()
+    cap.release()
+
+    if not ret or img is None:
+        print("Error: Could not read the first frame from the video.")
         return
 
     cv2.namedWindow("Polygon Mask Drawer")

@@ -54,6 +54,38 @@ def point_inside_box(point, box_coords):
     return x1 <= px <= x2 and y1 <= py <= y2
 
 
+def _point_on_segment(point, seg_start, seg_end):
+    px, py = point
+    x1, y1 = seg_start
+    x2, y2 = seg_end
+
+    cross = (px - x1) * (y2 - y1) - (py - y1) * (x2 - x1)
+    if cross != 0:
+        return False
+
+    return min(x1, x2) <= px <= max(x1, x2) and min(y1, y2) <= py <= max(y1, y2)
+
+
+def point_inside_polygon(point, polygon):
+    px, py = point
+    inside = False
+
+    for i in range(len(polygon)):
+        x1, y1 = polygon[i]
+        x2, y2 = polygon[(i + 1) % len(polygon)]
+
+        if _point_on_segment(point, (x1, y1), (x2, y2)):
+            return True
+
+        intersects = ((y1 > py) != (y2 > py))
+        if intersects:
+            x_intersection = x1 + (py - y1) * (x2 - x1) / (y2 - y1)
+            if px < x_intersection:
+                inside = not inside
+
+    return inside
+
+
 
 def counter_clock_wise(a, b, c):
     return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])

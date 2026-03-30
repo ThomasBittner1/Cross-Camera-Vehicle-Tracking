@@ -37,12 +37,12 @@ video_path_pair = [
 CROSS_LINE_BOTH = [[(773, 175), (953, 256)],
                     [(227, 283), (731, 956)]]
 
-MASK_PTS_PAIR = [[(0, 416), (721, 147), (963, 122), (1074, 197), (244, 959), (1, 955)],
-                 [(4, 392), (336, 269), (766, 180), (1033, 160), (1144, 238), (556, 912), (334, 958), (5, 959)]]
+MASK_PTS_PAIR = [[(4, 159), (228, 180), (489, 139), (696, 177), (1021, 119), (1279, 211), (1279, 2), (1, 4)],
+                 [(181, 57), (438, 129), (527, 123), (749, 169), (1090, 144), (1251, 211), (1275, 2), (177, 3)]]
 
 MASK_PTS_BOT_1 = [(657, 948), (1083, 286), (1278, 419), (1277, 956)]
 MASK_PTS_TOP_1 = [(3, 252), (589, 76), (586, 1), (1, 2)]
-BEGIN_CHECK_FRAMES = 3
+came_from_other_directions_1 = {}
 
 def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_mean=True):
     if distributed_count:
@@ -74,7 +74,7 @@ def run():
     embedding_histories_1 = defaultdict(list)
     embedding_of_crossed_0_map = []
     embedding_of_crossed_0 = np.zeros(0)
-
+    is_important_1 = {}
     best_matches_1 = defaultdict(dict)
     pending_click_pair = [None for _ in window_name_pair]
     isolated_track_id_pair = [None for _ in window_name_pair]
@@ -116,9 +116,9 @@ def run():
     for f, cap in enumerate(cap_pair):
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        mask = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
+        mask = np.full((frame_height, frame_width, 3), 255, dtype=np.uint8)
         pts = np.array(MASK_PTS_PAIR[f], dtype=np.int32)
-        cv2.fillPoly(mask, [pts], (255, 255, 255))
+        cv2.fillPoly(mask, [pts], (0, 0, 0))
         mask_pair.append(mask)
 
     frame_draw_data_pair = [None, None]
@@ -159,7 +159,18 @@ def run():
                 one_or_more_cars_just_crossed = False
 
                 if f == 1:
-                    # append crops of right camera to their embedding histories
+                    for t,track in enumerate(tracks):
+                        x1, y1, x2, y2 = map(int, track[:4])
+                        track_id = int(track[4])
+                        if not track_id in is_important_1:
+                            bottom_center = (int((x1 + x2) / 2), y2)
+                            is_inside_bot_mask = (geometry_utils.point_inside_polygon(bottom_center, MASK_PTS_BOT_1) or
+                                                  geometry_utils.point_inside_polygon(bottom_center, MASK_PTS_TOP_1))
+                            is_important_1[track_id] = not is_inside_bot_mask
+
+
+
+                    # append crops to their embedding histories
                     #
                     non_overlapping_crops_1 = []
                     non_overlapping_track_ids_1 = []
@@ -226,7 +237,7 @@ def run():
                     elif f == 1:
                         updated_match = False
                         other_track_id = None
-                        if not all_overlapping_1[t]:
+                        if not all_overlapping_1[t] and len(embedding_histories_1[track_id]):
                             query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
 
                             if embedding_of_crossed_0.size == 0 or not embedding_of_crossed_0_map:
@@ -331,6 +342,8 @@ def run():
                                 offset_y += target_h + other_gap
                     else:
                         raise Exception(f"unknown window name: {window_name_pair[f]}")
+                    if f == 1:
+                        label = f"{label} important: {is_important_1[track_id]}"
                     draw_data['boxes'].append({
                         'track_id': track_id,
                         'coords': (x1, y1, x2, y2),
