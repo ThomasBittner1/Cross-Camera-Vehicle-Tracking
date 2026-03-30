@@ -20,6 +20,13 @@ importlib.reload(color_utils)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 COLORS_PAIR = [(255, 0, 0), (0, 255, 0)]
+
+INFERENCE_IGNORE_AREA_COLOR = (255, 0, 0)
+INFERENCE_IGNORE_AREA_ALPHA = 0.2
+
+NOT_FROM_OTHER_CAMERA_AREA_COLOR = (0, 0, 255)
+NOT_FROM_OTHER_CAMERA_AREA_ALPHA = 0.2
+
 EMBEDDING_SIMILARITY_THRESHOLD = 0.3
 COLOR_SIMILARITY_THRESHOLD = 0.3
 NUM_SHOW_POSSIBLE_OTHERS = 5
@@ -37,8 +44,8 @@ video_path_pair = [
 CROSS_LINE_BOTH = [[(773, 175), (953, 256)],
                     [(227, 283), (731, 956)]]
 
-MASK_PTS_PAIR = [[(4, 159), (228, 180), (489, 139), (696, 177), (1021, 119), (1279, 211), (1279, 2), (1, 4)],
-                 [(181, 57), (438, 129), (527, 123), (749, 169), (1090, 144), (1251, 211), (1275, 2), (177, 3)]]
+MASK_PTS_PAIR = [[(1278, 493), (961, 256), (1101, 163), (1027, 101), (881, 126), (684, 165), (499, 128), (304, 142), (168, 145), (7, 222), (57, 290), (2, 352), (0, 7), (1278, 4)],
+                 [(1, 293), (146, 205), (105, 124), (247, 86), (424, 135), (534, 116), (728, 168), (1011, 148), (1133, 145), (1199, 197), (1087, 273), (1138, 361), (1278, 412), (1276, 3), (5, 3)]]
 
 MASK_PTS_BOT_1 = [(657, 948), (1083, 286), (1278, 419), (1277, 956)]
 MASK_PTS_TOP_1 = [(2, 370), (536, 188), (888, 162), (1277, 199), (1275, 5), (2, 4)]
@@ -75,7 +82,7 @@ def run():
     embedding_histories_1 = defaultdict(list)
     embedding_of_crossed_0_map = []
     embedding_of_crossed_0 = np.zeros(0)
-    is_important_1 = {}
+    comes_from_other_camera_1 = {}
     best_matches_1 = defaultdict(dict)
     pending_click_pair = [None for _ in window_name_pair]
     isolated_track_id_pair = [None for _ in window_name_pair]
@@ -163,11 +170,11 @@ def run():
                     for t,track in enumerate(tracks):
                         x1, y1, x2, y2 = map(int, track[:4])
                         track_id = int(track[4])
-                        if not track_id in is_important_1:
+                        if not track_id in comes_from_other_camera_1:
                             bottom_center = (int((x1 + x2) / 2), y2)
                             is_inside_bot_mask = (geometry_utils.point_inside_polygon(bottom_center, MASK_PTS_BOT_1) or
                                                   geometry_utils.point_inside_polygon(bottom_center, MASK_PTS_TOP_1))
-                            is_important_1[track_id] = not is_inside_bot_mask
+                            comes_from_other_camera_1[track_id] = not is_inside_bot_mask
 
 
 
@@ -178,7 +185,7 @@ def run():
                     all_overlapping_1 = []
                     for t,track in enumerate(tracks):
                         track_id = int(track[4])
-                        if is_important_1[track_id]:
+                        if comes_from_other_camera_1[track_id]:
                             x1, y1, x2, y2 = map(int, track[:4])
                             is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                             if not is_overlapping:
@@ -198,7 +205,7 @@ def run():
                 are_overlapping = []
                 for t, track in enumerate(tracks):
                     track_id = int(track[4])
-                    if f == 1 and not is_important_1[track_id]:
+                    if f == 1 and not comes_from_other_camera_1[track_id]:
                         continue
 
                     x1, y1, x2, y2 = map(int, track[:4])
@@ -350,7 +357,7 @@ def run():
                     else:
                         raise Exception(f"unknown window name: {window_name_pair[f]}")
                     if f == 1:
-                        label = f"{label} important: {is_important_1[track_id]}"
+                        label = f"{label} important: {comes_from_other_camera_1[track_id]}"
                     draw_data['boxes'].append({
                         'track_id': track_id,
                         'coords': (x1, y1, x2, y2),
@@ -412,6 +419,17 @@ def run():
 
             draw_data = frame_draw_data_pair[f]
             isolated_track_id = isolated_track_id_pair[f]
+            overlay = draw_frame.copy()
+
+            cv2.fillPoly(overlay, [np.array(MASK_PTS_PAIR[f], dtype=np.int32)], NOT_FROM_OTHER_CAMERA_AREA_COLOR)
+            cv2.addWeighted(overlay, NOT_FROM_OTHER_CAMERA_AREA_ALPHA, draw_frame, 1 - NOT_FROM_OTHER_CAMERA_AREA_ALPHA, 0, draw_frame)
+
+            if f == 1:
+                overlay = draw_frame.copy()
+                cv2.fillPoly(overlay, [np.array(MASK_PTS_BOT_1, dtype=np.int32)], INFERENCE_IGNORE_AREA_COLOR)
+                cv2.fillPoly(overlay, [np.array(MASK_PTS_TOP_1, dtype=np.int32)], INFERENCE_IGNORE_AREA_COLOR)
+                cv2.addWeighted(overlay, INFERENCE_IGNORE_AREA_ALPHA, draw_frame, 1 - INFERENCE_IGNORE_AREA_ALPHA, 0, draw_frame)
+
             cv2.line(draw_frame, draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
 
             for box in draw_data['boxes']:
