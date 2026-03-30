@@ -26,7 +26,7 @@ NUM_SHOW_POSSIBLE_OTHERS = 5
 MODEL_PATH = r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt"
 
 
-START_FRAME_INDEX = 950
+START_FRAME_INDEX = 1500
 window_name_pair = ['c042', 'c041']
 
 video_path_pair = [
@@ -41,7 +41,8 @@ MASK_PTS_PAIR = [[(4, 159), (228, 180), (489, 139), (696, 177), (1021, 119), (12
                  [(181, 57), (438, 129), (527, 123), (749, 169), (1090, 144), (1251, 211), (1275, 2), (177, 3)]]
 
 MASK_PTS_BOT_1 = [(657, 948), (1083, 286), (1278, 419), (1277, 956)]
-MASK_PTS_TOP_1 = [(3, 252), (589, 76), (586, 1), (1, 2)]
+MASK_PTS_TOP_1 = [(2, 370), (536, 188), (888, 162), (1277, 199), (1275, 5), (2, 4)]
+
 came_from_other_directions_1 = {}
 
 def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_mean=True):
