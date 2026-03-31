@@ -190,7 +190,7 @@ def run():
                             is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                             if not is_overlapping:
                                 non_overlapping_track_ids_1.append(track_id)
-                                non_overlapping_crops_1.append(geometry_utils.get_shrunk_crop(orig_frame_pair[f][y1:y2, x1:x2]))
+                                non_overlapping_crops_1.append(geometry_utils.get_shrunk_crop(orig_frame_pair[f], x1, y1, x2, y2, scale=0.8))
                             all_overlapping_1.append(is_overlapping)
                         else:
                             all_overlapping_1.append(None)
@@ -292,50 +292,9 @@ def run():
 
 
                             best_matches_1[track_id].sort(key=lambda x: x['closest_embedding_score'], reverse=True)
-
-                            offset_y = 0
-                            other_gap = 8
-                            for _match_data in best_matches_1[track_id][0:NUM_SHOW_POSSIBLE_OTHERS]:
-                                other_track_id = _match_data['other_track_id']
-                                elapsed_time = _match_data['elapsed_time']
-                                other_draw_crop = _match_data['other_draw_crop']
-                                other_label = (
-                                    f"id:{other_track_id}"
-                                    f" score:{_match_data['closest_embedding_score']:.3f}"
-                                    f" t:{elapsed_time:.1f}"
-                                )
-
-                                crop_h, crop_w = other_draw_crop.shape[:2]
-                                box_w = max(1, x2 - x1)
-                                target_w = max(1, int(round(box_w * 0.5)))
-                                scale = target_w / max(1, crop_w)
-                                target_h = max(1, int(round(crop_h * scale)))
-
-                                frame_h, frame_w = orig_frame_pair[f].shape[:2]
-                                paste_x2 = min(frame_w, x2)
-                                base_y2 = min(frame_h, y2)
-                                paste_y2 = min(frame_h, base_y2 + offset_y)
-                                paste_x1 = max(0, paste_x2 - target_w)
-                                paste_y1 = max(0, paste_y2 - target_h)
-
-                                draw_data['others'].append({
-                                    'track_id': track_id,
-                                    'crop': other_draw_crop,
-                                    'target_w': target_w,
-                                    'target_h': target_h,
-                                    'paste_x1': paste_x1,
-                                    'paste_y1': paste_y1,
-                                    'paste_x2': paste_x2,
-                                    'paste_y2': paste_y2,
-                                    'other_track_id': _match_data['other_track_id'],
-                                    'label': other_label,
-                                })
-
-                                offset_y += target_h + other_gap
                     else:
                         raise Exception(f"unknown window name: {window_name_pair[f]}")
-                    if f == 1:
-                        label = f"{label} important: {comes_from_other_camera_1[track_id]}"
+
                     draw_data['boxes'].append({
                         'track_id': track_id,
                         'coords': (x1, y1, x2, y2),
@@ -417,18 +376,45 @@ def run():
                 cv2.rectangle(draw_frame, (x1, y1), (x2, y2), box['box_color'], 2)
                 cv2.putText(draw_frame, box['label'], (x1, max(20, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box['label_color'], 2)
 
-            for other in draw_data['others']:
-                if isolated_track_id is not None and other['track_id'] != isolated_track_id:
+                if f != 1 or box['track_id'] not in best_matches_1:
                     continue
-                resized_crop = cv2.resize(other['crop'], (other['target_w'], other['target_h']))
-                if other['paste_y1'] < other['paste_y2'] and other['paste_x1'] < other['paste_x2']:
-                    visible_crop = resized_crop[
-                        other['target_h'] - (other['paste_y2'] - other['paste_y1']):,
-                        other['target_w'] - (other['paste_x2'] - other['paste_x1']):,
-                    ]
-                    draw_frame[other['paste_y1']:other['paste_y2'], other['paste_x1']:other['paste_x2']] = visible_crop
-                cv2.putText(draw_frame, other['label'], (other['paste_x1'], max(20, other['paste_y1'] - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
+                offset_y = 0
+                # other_gap = 8
+                best_matches_1[box['track_id']].sort(key=lambda x: x['closest_embedding_score'], reverse=True)
+                for _match_data in best_matches_1[box['track_id']][0:NUM_SHOW_POSSIBLE_OTHERS]:
+                    other_track_id = _match_data['other_track_id']
+                    elapsed_time = _match_data['elapsed_time']
+                    other_draw_crop = _match_data['other_draw_crop']
+                    other_label = (
+                        f"id:{other_track_id}"
+                        f" score:{_match_data['closest_embedding_score']:.3f}"
+                        f" t:{elapsed_time:.1f}"
+                    )
+
+                    crop_h, crop_w = other_draw_crop.shape[:2]
+                    box_w = max(1, x2 - x1)
+                    target_w = max(1, int(round(box_w * 0.5)))
+                    scale = target_w / max(1, crop_w)
+                    target_h = max(1, int(round(crop_h * scale)))
+
+                    frame_h, frame_w = draw_frame.shape[:2]
+                    paste_x2 = min(frame_w, x2)
+                    base_y2 = min(frame_h, y2)
+                    paste_y2 = min(frame_h, base_y2 + offset_y)
+                    paste_x1 = max(0, paste_x2 - target_w)
+                    paste_y1 = max(0, paste_y2 - target_h)
+
+                    resized_crop = cv2.resize(other_draw_crop, (target_w, target_h))
+                    if paste_y1 < paste_y2 and paste_x1 < paste_x2:
+                        visible_crop = resized_crop[
+                            target_h - (paste_y2 - paste_y1):,
+                            target_w - (paste_x2 - paste_x1):,
+                        ]
+                        draw_frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
+                    cv2.putText(draw_frame, other_label, (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+
+                    offset_y += target_h
 
             cv2.putText(draw_frame, draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
             cv2.imshow(window_name_pair[f], draw_frame)
