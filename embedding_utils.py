@@ -32,7 +32,7 @@ def cosine_distance(query, gallery):
     return 1.0 - cosine_similarity(query, gallery)
 
 
-def find_closest_embedding(query, gallery):
+def find_closest_embeddings(query, gallery, max_count=5):
     gallery = np.asarray(gallery, dtype=np.float32)
     if gallery.ndim == 1:
         gallery = gallery[None, :]
@@ -43,9 +43,10 @@ def find_closest_embedding(query, gallery):
     if scores.ndim == 2:
         scores = scores[0]
 
-    best_idx = int(np.argmax(scores))
-    best_score = float(scores[best_idx])
-    return best_idx, best_score
+    max_count = max(1, min(int(max_count), len(scores)))
+    best_indices = np.argsort(scores)[::-1][:max_count]
+    best_scores = scores[best_indices]
+    return best_indices.tolist(), best_scores.astype(float).tolist()
 
 
 class IBN(nn.Module):
@@ -281,5 +282,5 @@ class EmbeddingGenerator:
         return cosine_distance(query, gallery)
 
     @staticmethod
-    def find_closest(query, gallery):
-        return find_closest_embedding(query, gallery)
+    def find_closest(query, gallery, max_count=5):
+        return find_closest_embedding(query, gallery, max_count=max_count)

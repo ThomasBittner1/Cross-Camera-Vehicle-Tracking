@@ -83,7 +83,7 @@ def run():
     embedding_of_crossed_0_map = []
     embedding_of_crossed_0 = np.zeros(0)
     comes_from_other_camera_1 = {}
-    best_matches_1 = defaultdict(dict)
+    best_matches_1 = defaultdict(list)
     pending_click_pair = [None for _ in window_name_pair]
     isolated_track_id_pair = [None for _ in window_name_pair]
 
@@ -190,7 +190,7 @@ def run():
                             is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
                             if not is_overlapping:
                                 non_overlapping_track_ids_1.append(track_id)
-                                non_overlapping_crops_1.append(orig_frame_pair[f][y1:y2, x1:x2])
+                                non_overlapping_crops_1.append(geometry_utils.get_shrunk_crop(orig_frame_pair[f][y1:y2, x1:x2]))
                             all_overlapping_1.append(is_overlapping)
                         else:
                             all_overlapping_1.append(None)
@@ -249,85 +249,63 @@ def run():
                     # c041: compare embeddings and histograms at each frame
                     #
                     elif f == 1:
-                        updated_match = False
-                        other_track_id = None
                         if not all_overlapping_1[t] and len(embedding_histories_1[track_id]):
                             query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
 
                             if embedding_of_crossed_0.size == 0 or not embedding_of_crossed_0_map:
-                                closest_embedding_idx, closest_embedding_score = None, None
+                                closest_embedding_indices, closest_embedding_scores = [], []
                             else:
-                                closest_embedding_idx, closest_embedding_score = embedding_utils.find_closest_embedding(query_embedding, embedding_of_crossed_0)
+                                closest_embedding_indices, closest_embedding_scores = embedding_utils.find_closest_embeddings(query_embedding, embedding_of_crossed_0)
 
-                            if closest_embedding_idx is not None and closest_embedding_score >= EMBEDDING_SIMILARITY_THRESHOLD:
-                                query_color_hist = color_utils.compute_vehicle_color_histogram(orig_frame_pair[f][y1:y2, x1:x2])
-                                other_track_id = embedding_of_crossed_0_map[closest_embedding_idx]
-                                matched_color_idx, matched_color_score = color_utils.compare_histograms(
-                                    query_color_hist,
-                                    histograms_of_crossed_0.get(other_track_id, []))
 
-                                if matched_color_score and matched_color_score >= COLOR_SIMILARITY_THRESHOLD:
-                                    other_crop = None
-                                    distributed_crops = general_utils.get_distributed_items(good_crops_per_ids_0[other_track_id]
-                                                                                            if len(good_crops_per_ids_0[other_track_id])
-                                                                                            else bad_crops_per_ids_0[other_track_id] )
-                                    if matched_color_idx is not None and matched_color_idx < len(distributed_crops):
-                                        other_crop = distributed_crops[matched_color_idx]
-                                    elif distributed_crops:
-                                        other_crop = distributed_crops[0]
+                            for closest_embedding_index, closest_embedding_score in zip(closest_embedding_indices, closest_embedding_scores):
+                                other_track_id = embedding_of_crossed_0_map[closest_embedding_index]
 
-                                    closest_total_score = closest_embedding_score * matched_color_score
+                                other_draw_crop = good_crops_per_ids_0[other_track_id][0] \
+                                    if len(good_crops_per_ids_0[other_track_id]) else bad_crops_per_ids_0[other_track_id][0]
 
-                                    if track_id in crossed_times_pair[1]:
-                                        elapsed_time = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
-                                        # label = f"{label} t:{elapsed_time:.3f}"
-                                    else:
-                                        elapsed_time = -1.0
+                                if track_id in crossed_times_pair[1]:
+                                    elapsed_time = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
+                                else:
+                                    elapsed_time = -1.0
 
-                                    do_record = False
-                                    if track_id not in best_matches_1:
-                                        do_record = True
-                                    else:
-                                        if other_track_id not in best_matches_1[track_id]:
-                                            do_record = True
-                                        else:
-                                            if best_matches_1[track_id][other_track_id]['closest_total_score'] < closest_total_score:
-                                                do_record = True
-                                    if do_record:
-                                        best_matches_1[track_id][other_track_id] = {'closest_total_score': closest_total_score,
-                                                                                    'closest_embedding_score': closest_embedding_score,
-                                                                                    'matched_color_score': matched_color_score,
-                                                                                    'other_crop': other_crop,
-                                                                                    'other_track_id': other_track_id,
-                                                                                    'elapsed_time': elapsed_time}
-                                        updated_match = True
+                                do_append = True
+                                for _match_data in best_matches_1[track_id]:
+                                    if _match_data['other_track_id'] == other_track_id:
+                                        do_append = False
+                                        break
+                                if do_append:
+                                    best_matches_1[track_id].append({'closest_embedding_score': closest_embedding_score,
+                                                                    'other_draw_crop': other_draw_crop,
+                                                                    'other_track_id': other_track_id,
+                                                                    'elapsed_time': -1.0})
+
 
                         # update the elapsed time, in case the car crossed and it wasn't calculated yet
                         #
-                        if not updated_match:
-                            if track_id in best_matches_1 and other_track_id in best_matches_1[track_id]:
-                                if track_id in crossed_times_pair[1]:
-                                    if best_matches_1[track_id][other_track_id]['elapsed_time'] == -1.0:
-                                        best_matches_1[track_id][other_track_id]['elapsed_time'] = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
-
                         if track_id in best_matches_1:
-                            matches = best_matches_1[track_id]
-                            sorted_other_ids = sorted(list(matches.keys()), key=lambda x: matches[x]['closest_total_score'], reverse=True)
+                            if track_id in crossed_times_pair[1]:
+                                for _match_data in best_matches_1[track_id]:
+                                        if _match_data['elapsed_time'] == -1.0:
+                                            other_track_id = _match_data['other_track_id']
+                                            _match_data['elapsed_time'] = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
+
+
+                            best_matches_1[track_id].sort(key=lambda x: x['closest_embedding_score'], reverse=True)
+
                             offset_y = 0
                             other_gap = 8
-                            for other_id in sorted_other_ids[0:NUM_SHOW_POSSIBLE_OTHERS]:
-
-                                match = best_matches_1[track_id][other_id]
-                                elapsed_time = match['elapsed_time']
-                                other_crop = match['other_crop']
+                            for _match_data in best_matches_1[track_id][0:NUM_SHOW_POSSIBLE_OTHERS]:
+                                other_track_id = _match_data['other_track_id']
+                                elapsed_time = _match_data['elapsed_time']
+                                other_draw_crop = _match_data['other_draw_crop']
                                 other_label = (
-                                    f"id:{match['other_track_id']}"
-                                    f" score:{round(match['closest_embedding_score'], 4)}"
-                                    f" color:{match['matched_color_score']:.2f}"
+                                    f"id:{other_track_id}"
+                                    f" score:{_match_data['closest_embedding_score']:.3f}"
                                     f" t:{elapsed_time:.1f}"
                                 )
 
-                                crop_h, crop_w = other_crop.shape[:2]
+                                crop_h, crop_w = other_draw_crop.shape[:2]
                                 box_w = max(1, x2 - x1)
                                 target_w = max(1, int(round(box_w * 0.5)))
                                 scale = target_w / max(1, crop_w)
@@ -342,14 +320,14 @@ def run():
 
                                 draw_data['others'].append({
                                     'track_id': track_id,
-                                    'crop': other_crop,
+                                    'crop': other_draw_crop,
                                     'target_w': target_w,
                                     'target_h': target_h,
                                     'paste_x1': paste_x1,
                                     'paste_y1': paste_y1,
                                     'paste_x2': paste_x2,
                                     'paste_y2': paste_y2,
-                                    'other_track_id': match['other_track_id'],
+                                    'other_track_id': _match_data['other_track_id'],
                                     'label': other_label,
                                 })
 
