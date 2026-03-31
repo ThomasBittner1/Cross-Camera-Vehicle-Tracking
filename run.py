@@ -380,9 +380,12 @@ def run():
                 if f != 1 or box['track_id'] not in best_matches_1:
                     continue
 
-                stack_y = min(draw_frame.shape[0], y2)
                 best_matches_1[box['track_id']].sort(key=lambda x: x['embedding_score'], reverse=True)
-                for _match_data in best_matches_1[box['track_id']][0:NUM_SHOW_POSSIBLE_OTHERS]:
+                panel_items = []
+                panel_width = 0
+                panel_height = 0
+                top_matches = best_matches_1[box['track_id']][0:NUM_SHOW_POSSIBLE_OTHERS]
+                for _match_data in reversed(top_matches):
                     other_track_id = _match_data['other_track_id']
                     elapsed_time = _match_data['elapsed_time']
                     other_draw_crop = _match_data['other_draw_crop']
@@ -398,22 +401,65 @@ def run():
                     scale = target_w / max(1, crop_w)
                     target_h = max(1, int(round(crop_h * scale)))
 
-                    frame_h, frame_w = draw_frame.shape[:2]
-                    paste_x2 = min(frame_w, x2)
-                    paste_x1 = max(0, paste_x2 - target_w)
-                    paste_y1 = stack_y
-                    paste_y2 = min(frame_h, paste_y1 + target_h)
+                    panel_items.append({
+                        'crop': other_draw_crop,
+                        'target_w': target_w,
+                        'target_h': target_h,
+                        'label': other_label,
+                    })
+                    panel_width = max(panel_width, target_w)
+                    panel_height += target_h
 
-                    resized_crop = cv2.resize(other_draw_crop, (target_w, target_h))
-                    if paste_y1 < paste_y2 and paste_x1 < paste_x2:
-                        visible_crop = resized_crop[
-                            :paste_y2 - paste_y1,
-                            target_w - (paste_x2 - paste_x1):,
-                        ]
-                        draw_frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                    cv2.putText(draw_frame, other_label, (paste_x1, paste_y2 - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                if panel_width == 0 or panel_height == 0:
+                    continue
 
-                    stack_y = paste_y2
+                panel = np.zeros((panel_height, panel_width, 3), dtype=draw_frame.dtype)
+                text_items = []
+                panel_y = 0
+                for item in panel_items:
+                    resized_crop = cv2.resize(item['crop'], (item['target_w'], item['target_h']))
+                    panel_x1 = panel_width - item['target_w']
+                    panel_x2 = panel_width
+                    panel_y1 = panel_y
+                    panel_y2 = panel_y + item['target_h']
+                    panel[panel_y1:panel_y2, panel_x1:panel_x2] = resized_crop
+                    text_items.append({
+                        'label': item['label'],
+                        'x': panel_x1,
+                        'y': panel_y2 - 3,
+                    })
+                    panel_y = panel_y2
+
+                frame_h, frame_w = draw_frame.shape[:2]
+                paste_x2 = min(frame_w, x2)
+                paste_y2 = min(frame_h, y2)
+                paste_x1 = max(0, paste_x2 - panel_width)
+                paste_y1 = max(0, paste_y2 - panel_height)
+                visible_w = paste_x2 - paste_x1
+                visible_h = paste_y2 - paste_y1
+
+                if visible_w <= 0 or visible_h <= 0:
+                    continue
+
+                visible_panel = panel[panel_height - visible_h:, panel_width - visible_w:]
+                draw_frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_panel
+
+                hidden_x = panel_width - visible_w
+                hidden_y = panel_height - visible_h
+                for text_item in text_items:
+                    text_x = text_item['x'] - hidden_x
+                    text_y = text_item['y'] - hidden_y
+                    if text_y < 0 or text_y >= visible_h:
+                        continue
+                    cv2.putText(
+                        draw_frame,
+                        text_item['label'],
+                        (paste_x1 + max(0, text_x), paste_y1 + text_y),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        COLORS_PAIR[0],
+                        2,
+                    )
 
             cv2.putText(draw_frame, draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
             cv2.imshow(window_name_pair[f], draw_frame)
