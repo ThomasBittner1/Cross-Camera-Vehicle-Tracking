@@ -22,10 +22,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 COLORS_PAIR = [(255, 0, 0), (0, 255, 0)]
 
 INFERENCE_IGNORE_AREA_COLOR = (255, 0, 0)
-INFERENCE_IGNORE_AREA_ALPHA = 0
+INFERENCE_IGNORE_AREA_ALPHA = 0.5
 
 NOT_FROM_OTHER_CAMERA_AREA_COLOR = (0, 0, 255)
-NOT_FROM_OTHER_CAMERA_AREA_ALPHA = 0
+NOT_FROM_OTHER_CAMERA_AREA_ALPHA = 0.5
 
 EMBEDDING_SIMILARITY_THRESHOLD = 0.0
 COLOR_SIMILARITY_THRESHOLD = 0.0
@@ -33,7 +33,7 @@ NUM_SHOW_POSSIBLE_OTHERS = 5
 MODEL_PATH = r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt"
 
 
-START_FRAME_INDEX = 0
+START_FRAME_INDEX = 800
 window_name_pair = ['c042', 'c041']
 
 video_path_pair = [
