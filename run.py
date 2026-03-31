@@ -253,12 +253,12 @@ def run():
                             query_embedding = np.mean(embedding_histories_1[track_id], axis=0)
 
                             if embedding_of_crossed_0.size == 0 or not embedding_of_crossed_0_map:
-                                closest_embedding_indices, closest_embedding_scores = [], []
+                                closest_embedding_indices, embedding_scores = [], []
                             else:
-                                closest_embedding_indices, closest_embedding_scores = embedding_utils.find_closest_embeddings(query_embedding, embedding_of_crossed_0)
+                                closest_embedding_indices, embedding_scores = embedding_utils.find_closest_embeddings(query_embedding, embedding_of_crossed_0)
 
 
-                            for closest_embedding_index, closest_embedding_score in zip(closest_embedding_indices, closest_embedding_scores):
+                            for closest_embedding_index, embedding_score in zip(closest_embedding_indices, embedding_scores):
                                 other_track_id = embedding_of_crossed_0_map[closest_embedding_index]
 
                                 other_draw_crop = good_crops_per_ids_0[other_track_id][0] \
@@ -275,7 +275,7 @@ def run():
                                         do_append = False
                                         break
                                 if do_append:
-                                    best_matches_1[track_id].append({'closest_embedding_score': closest_embedding_score,
+                                    best_matches_1[track_id].append({'embedding_score': embedding_score,
                                                                     'other_draw_crop': other_draw_crop,
                                                                     'other_track_id': other_track_id,
                                                                     'elapsed_time': -1.0})
@@ -291,7 +291,7 @@ def run():
                                             _match_data['elapsed_time'] = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
 
 
-                            best_matches_1[track_id].sort(key=lambda x: x['closest_embedding_score'], reverse=True)
+                            best_matches_1[track_id].sort(key=lambda x: x['embedding_score'], reverse=True)
                     else:
                         raise Exception(f"unknown window name: {window_name_pair[f]}")
 
@@ -381,14 +381,14 @@ def run():
 
                 offset_y = 0
                 # other_gap = 8
-                best_matches_1[box['track_id']].sort(key=lambda x: x['closest_embedding_score'], reverse=True)
+                best_matches_1[box['track_id']].sort(key=lambda x: x['embedding_score'], reverse=True)
                 for _match_data in best_matches_1[box['track_id']][0:NUM_SHOW_POSSIBLE_OTHERS]:
                     other_track_id = _match_data['other_track_id']
                     elapsed_time = _match_data['elapsed_time']
                     other_draw_crop = _match_data['other_draw_crop']
                     other_label = (
                         f"id:{other_track_id}"
-                        f" score:{_match_data['closest_embedding_score']:.3f}"
+                        f" score:{_match_data['embedding_score']:.3f}"
                         f" t:{elapsed_time:.1f}"
                     )
 
