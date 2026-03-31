@@ -270,8 +270,9 @@ def run():
                                     elapsed_time = -1.0
 
                                 do_append = True
-                                for _match_data in best_matches_1[track_id]:
+                                for m, _match_data in enumerate(best_matches_1[track_id]):
                                     if _match_data['other_track_id'] == other_track_id:
+                                        _match_data['embedding_score'] = embedding_score
                                         do_append = False
                                         break
                                 if do_append:
@@ -379,8 +380,7 @@ def run():
                 if f != 1 or box['track_id'] not in best_matches_1:
                     continue
 
-                offset_y = 0
-                # other_gap = 8
+                stack_y = min(draw_frame.shape[0], y2)
                 best_matches_1[box['track_id']].sort(key=lambda x: x['embedding_score'], reverse=True)
                 for _match_data in best_matches_1[box['track_id']][0:NUM_SHOW_POSSIBLE_OTHERS]:
                     other_track_id = _match_data['other_track_id']
@@ -400,21 +400,20 @@ def run():
 
                     frame_h, frame_w = draw_frame.shape[:2]
                     paste_x2 = min(frame_w, x2)
-                    base_y2 = min(frame_h, y2)
-                    paste_y2 = min(frame_h, base_y2 + offset_y)
                     paste_x1 = max(0, paste_x2 - target_w)
-                    paste_y1 = max(0, paste_y2 - target_h)
+                    paste_y1 = stack_y
+                    paste_y2 = min(frame_h, paste_y1 + target_h)
 
                     resized_crop = cv2.resize(other_draw_crop, (target_w, target_h))
                     if paste_y1 < paste_y2 and paste_x1 < paste_x2:
                         visible_crop = resized_crop[
-                            target_h - (paste_y2 - paste_y1):,
+                            :paste_y2 - paste_y1,
                             target_w - (paste_x2 - paste_x1):,
                         ]
                         draw_frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_crop
-                    cv2.putText(draw_frame, other_label, (paste_x1, max(20, paste_y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
+                    cv2.putText(draw_frame, other_label, (paste_x1, paste_y2 - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLORS_PAIR[0], 2)
 
-                    offset_y += target_h
+                    stack_y = paste_y2
 
             cv2.putText(draw_frame, draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
             cv2.imshow(window_name_pair[f], draw_frame)
