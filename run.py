@@ -476,9 +476,9 @@ def run():
             legend_lines = [
                 draw_data['frame_text'],
                 (
-                    f"0-9 matches:{num_other_matches_to_show}  "
-                    f"M inference-ignore:{'on' if show_inference_ignore_area else 'off'}  "
-                    f"O not-from-other-camera:{'on' if show_not_from_other_camera_area else 'off'}"
+                    f"0-9: matches ({num_other_matches_to_show})  "
+                    f"M: inference-ignore ({'on' if show_inference_ignore_area else 'off'})  "
+                    f"O: not-from-other-camera ({'on' if show_not_from_other_camera_area else 'off'})"
                 ),
             ]
             for line_idx, legend_line in enumerate(legend_lines):
