@@ -370,14 +370,14 @@ def run():
             isolated_track_id = isolated_track_id_pair[f]
             overlay = draw_frame.copy()
 
-            if show_not_from_other_camera_area:
-                cv2.fillPoly(overlay, [np.array(MASK_PTS_PAIR[f], dtype=np.int32)], NOT_FROM_OTHER_CAMERA_AREA_COLOR)
+            if show_inference_ignore_area:
+                cv2.fillPoly(overlay, [np.array(MASK_PTS_PAIR[f], dtype=np.int32)], INFERENCE_IGNORE_AREA_COLOR)
                 cv2.addWeighted(overlay, NOT_FROM_OTHER_CAMERA_AREA_ALPHA, draw_frame, 1 - NOT_FROM_OTHER_CAMERA_AREA_ALPHA, 0, draw_frame)
 
-            if f == 1 and show_inference_ignore_area:
+            if f == 1 and show_not_from_other_camera_area:
                 overlay = draw_frame.copy()
-                cv2.fillPoly(overlay, [np.array(MASK_PTS_BOT_1, dtype=np.int32)], INFERENCE_IGNORE_AREA_COLOR)
-                cv2.fillPoly(overlay, [np.array(MASK_PTS_TOP_1, dtype=np.int32)], INFERENCE_IGNORE_AREA_COLOR)
+                cv2.fillPoly(overlay, [np.array(MASK_PTS_BOT_1, dtype=np.int32)], NOT_FROM_OTHER_CAMERA_AREA_COLOR)
+                cv2.fillPoly(overlay, [np.array(MASK_PTS_TOP_1, dtype=np.int32)], NOT_FROM_OTHER_CAMERA_AREA_COLOR)
                 cv2.addWeighted(overlay, INFERENCE_IGNORE_AREA_ALPHA, draw_frame, 1 - INFERENCE_IGNORE_AREA_ALPHA, 0, draw_frame)
 
             cv2.line(draw_frame, draw_data['line'][0], draw_data['line'][1], (0, 0, 255), 2)
