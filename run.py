@@ -29,7 +29,7 @@ NOT_FROM_OTHER_CAMERA_AREA_ALPHA = 0.5
 
 EMBEDDING_SIMILARITY_THRESHOLD = 0.0
 COLOR_SIMILARITY_THRESHOLD = 0.0
-NUM_SHOW_POSSIBLE_OTHERS = 5
+NUM_OTHER_MATCHES_TO_SHOW = 5
 MODEL_PATH = r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt"
 
 
@@ -86,6 +86,9 @@ def run():
     best_matches_1 = defaultdict(list)
     pending_click_pair = [None for _ in window_name_pair]
     isolated_track_id_pair = [None for _ in window_name_pair]
+    num_other_matches_to_show = NUM_OTHER_MATCHES_TO_SHOW
+    show_inference_ignore_area = True
+    show_not_from_other_camera_area = True
 
     for f, window_name in enumerate(window_name_pair):
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -344,6 +347,12 @@ def run():
             break
         if key == ord(" "):
             paused = not paused
+        elif ord("0") <= key <= ord("9"):
+            num_other_matches_to_show = key - ord("0")
+        elif key in (ord("m"), ord("M")):
+            show_inference_ignore_area = not show_inference_ignore_area
+        elif key in (ord("o"), ord("O")):
+            show_not_from_other_camera_area = not show_not_from_other_camera_area
 
         if not paused:
             current_frame_index += 1
@@ -359,10 +368,11 @@ def run():
             isolated_track_id = isolated_track_id_pair[f]
             overlay = draw_frame.copy()
 
-            cv2.fillPoly(overlay, [np.array(MASK_PTS_PAIR[f], dtype=np.int32)], NOT_FROM_OTHER_CAMERA_AREA_COLOR)
-            cv2.addWeighted(overlay, NOT_FROM_OTHER_CAMERA_AREA_ALPHA, draw_frame, 1 - NOT_FROM_OTHER_CAMERA_AREA_ALPHA, 0, draw_frame)
+            if show_not_from_other_camera_area:
+                cv2.fillPoly(overlay, [np.array(MASK_PTS_PAIR[f], dtype=np.int32)], NOT_FROM_OTHER_CAMERA_AREA_COLOR)
+                cv2.addWeighted(overlay, NOT_FROM_OTHER_CAMERA_AREA_ALPHA, draw_frame, 1 - NOT_FROM_OTHER_CAMERA_AREA_ALPHA, 0, draw_frame)
 
-            if f == 1:
+            if f == 1 and show_inference_ignore_area:
                 overlay = draw_frame.copy()
                 cv2.fillPoly(overlay, [np.array(MASK_PTS_BOT_1, dtype=np.int32)], INFERENCE_IGNORE_AREA_COLOR)
                 cv2.fillPoly(overlay, [np.array(MASK_PTS_TOP_1, dtype=np.int32)], INFERENCE_IGNORE_AREA_COLOR)
@@ -384,7 +394,7 @@ def run():
                 panel_items = []
                 panel_width = 0
                 panel_height = 0
-                top_matches = best_matches_1[box['track_id']][0:NUM_SHOW_POSSIBLE_OTHERS]
+                top_matches = best_matches_1[box['track_id']][0:num_other_matches_to_show]
                 for _match_data in reversed(top_matches):
                     other_track_id = _match_data['other_track_id']
                     elapsed_time = _match_data['elapsed_time']
@@ -461,7 +471,17 @@ def run():
                         2,
                     )
 
-            cv2.putText(draw_frame, draw_data['frame_text'], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            legend_lines = [
+                draw_data['frame_text'],
+                (
+                    f"0-9 matches:{num_other_matches_to_show}  "
+                    f"M inference-ignore:{'on' if show_inference_ignore_area else 'off'}  "
+                    f"O not-from-other-camera:{'on' if show_not_from_other_camera_area else 'off'}"
+                ),
+            ]
+            for line_idx, legend_line in enumerate(legend_lines):
+                y = 30 + line_idx * 28
+                cv2.putText(draw_frame, legend_line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
             cv2.imshow(window_name_pair[f], draw_frame)
 
 
