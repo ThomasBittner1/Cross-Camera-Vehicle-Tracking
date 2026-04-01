@@ -33,7 +33,7 @@ NUM_OTHER_MATCHES_TO_SHOW = 5
 MODEL_PATH = r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt"
 
 
-START_FRAME_INDEX = 800
+START_FRAME_INDEX = 0
 window_name_pair = ['c042', 'c041']
 
 video_path_pair = [
@@ -263,9 +263,12 @@ def run():
 
                             for closest_embedding_index, embedding_score in zip(closest_embedding_indices, embedding_scores):
                                 other_track_id = embedding_of_crossed_0_map[closest_embedding_index]
-
-                                other_draw_crop = good_crops_per_ids_0[other_track_id][0] \
-                                    if len(good_crops_per_ids_0[other_track_id]) else bad_crops_per_ids_0[other_track_id][0]
+                                if len(good_crops_per_ids_0[other_track_id]):
+                                    good_crops_per_ids_0[other_track_id].sort(key=lambda xx: xx.shape[1])
+                                    other_draw_crop = good_crops_per_ids_0[other_track_id][-1]
+                                else:
+                                    bad_crops_per_ids_0[other_track_id].sort(key=lambda xx: xx.shape[1])
+                                    other_draw_crop = bad_crops_per_ids_0[other_track_id][-1]
 
                                 if track_id in crossed_times_pair[1]:
                                     elapsed_time = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
