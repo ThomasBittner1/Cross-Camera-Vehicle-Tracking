@@ -29,7 +29,6 @@ NOT_FROM_OTHER_CAMERA_AREA_ALPHA = 0.5
 
 EMBEDDING_SIMILARITY_THRESHOLD = 0.0
 COLOR_SIMILARITY_THRESHOLD = 0.0
-NUM_OTHER_MATCHES_TO_SHOW = 5
 MODEL_PATH = r"C:\ComputerVision\car_multicamera\runs\train10\weights\best.pt"
 
 
@@ -86,9 +85,9 @@ def run():
     best_matches_1 = defaultdict(list)
     pending_click_pair = [None for _ in window_name_pair]
     isolated_track_id_pair = [None for _ in window_name_pair]
-    num_other_matches_to_show = NUM_OTHER_MATCHES_TO_SHOW
-    show_inference_ignore_area = True
-    show_not_from_other_camera_area = True
+    num_other_matches_to_show = 5
+    show_inference_ignore_area = False
+    show_not_from_other_camera_area = False
 
     for f, window_name in enumerate(window_name_pair):
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
