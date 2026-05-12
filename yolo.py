@@ -16,7 +16,7 @@ class UltralyticsDetectionModel:
         self.model = YOLO(str(model_path), task="detect")
 
     def predict(self, frame):
-        results = self.model.track(frame, persist=True, verbose=False, conf=self.confidence, iou=self.iou)
+        results = self.model.predict(frame, verbose=False, conf=self.confidence, iou=self.iou)
         return [] if not results else ultralytics_result_to_detections(results[0], frame.shape)
 
     def describe(self):

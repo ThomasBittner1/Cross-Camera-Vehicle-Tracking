@@ -1,13 +1,13 @@
 import cv2
 import numpy as np
-from ultralytics import YOLO
 
 import embedding_utils
 import geometry_utils
 from config import AppConfig
 from reid_gallery import ReidGallery
-from tracking import create_tracker_pair, get_torch_device, tracks_from_prediction
+from tracking import create_tracker_pair, get_torch_device, tracks_from_model
 from visualization import Visualizer
+from yolo import load_detection_model
 
 
 def _create_masks(captures, mask_points_pair):
@@ -131,7 +131,7 @@ def run(config=None):
     embedder = embedding_utils.EmbeddingGenerator()
     reid_gallery = ReidGallery(embedder, config.not_from_other_camera_masks_camera_1)
     visualizer = Visualizer(config)
-    model = YOLO(config.model_path)
+    model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
 
     previous_centers_pair = [dict() for _ in config.video_paths]
     crossed_times_pair = [{}, {}]
@@ -168,11 +168,7 @@ def run(config=None):
                 for frame, mask in zip(frame_pair, masks)
             ]
 
-            result_pair = model.predict(source=masked_frame_pair, verbose=False, conf=0.02)
-            tracks_pair = [
-                tracks_from_prediction(result_pair[camera_index], trackers[camera_index], original_frames[camera_index])
-                for camera_index in [0, 1]
-            ]
+            tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames)
 
             reid_gallery.prepare_camera_1_tracks(tracks_pair[1], original_frames[1])
 

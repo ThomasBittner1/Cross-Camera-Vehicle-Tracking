@@ -37,5 +37,28 @@ def tracks_from_prediction(result, tracker, frame):
     return tracker.update(detections, frame)
 
 
+def tracks_from_detections(detections, tracker, frame):
+    if not detections:
+        return np.empty((0, 8), dtype=np.float32)
+
+    tracker_inputs = [
+        [
+            *detection["bounds"],
+            detection["confidence"],
+            -1 if detection["class_id"] is None else detection["class_id"],
+        ]
+        for detection in detections
+    ]
+    return tracker.update(np.array(tracker_inputs, dtype=np.float32), frame)
+
+
+def tracks_from_model(model, frames, trackers, original_frames):
+    detection_pair = [model.predict(frame) for frame in frames]
+    return [
+        tracks_from_detections(detection_pair[camera_index], trackers[camera_index], original_frames[camera_index])
+        for camera_index in range(len(detection_pair))
+    ]
+
+
 def get_torch_device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
