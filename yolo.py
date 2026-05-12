@@ -1,4 +1,5 @@
 from pathlib import Path
+import ast
 import json
 
 import cv2
@@ -54,8 +55,7 @@ class TensorRtDetectionModel:
         if self.engine is None:
             raise RuntimeError(f"Failed to load TensorRT engine: {self.model_path}")
 
-        raw_names = metadata.get("names", {})
-        self.names = {int(key): str(value) for key, value in raw_names.items()} if isinstance(raw_names, dict) else {}
+        self.names = parse_model_names(metadata.get("names"))
         self.context = self.engine.create_execution_context()
         self.input_name = None
         self.tensor_names = []
@@ -92,7 +92,7 @@ class TensorRtDetectionModel:
         self.context.execute_v2([self.binding_addresses[name] for name in self.tensor_names])
         torch.cuda.synchronize()
         outputs = [self.output_tensors[name].detach().cpu().numpy() for name in self.output_names]
-        return tensorrt_output_to_detections(outputs, frame.shape, scale, pad_x, pad_y, self.confidence, self.iou, self.names)
+        return model_output_to_detections(outputs, frame.shape, scale, pad_x, pad_y, self.confidence, self.iou, self.names)
 
     def preprocess(self, frame):
         frame_height, frame_width = frame.shape[:2]
@@ -122,13 +122,15 @@ class OnnxDetectionModel:
         self.execution_provider = None
         self.input_name = None
         self.input_size = input_size
+        self.names = {}
         self.net = None
         self.session = None
         try:
             import onnxruntime as ort
 
-            self._preload_gpu_dlls(ort)
             available_providers = set(ort.get_available_providers())
+            if "CUDAExecutionProvider" in available_providers:
+                self._preload_gpu_dlls(ort)
             preferred_providers = [provider for provider in ("CUDAExecutionProvider", "CPUExecutionProvider") if provider in available_providers]
             if not preferred_providers:
                 raise RuntimeError(f"No supported ONNX Runtime execution providers available: {sorted(available_providers)}")
@@ -137,6 +139,7 @@ class OnnxDetectionModel:
             input_shape = self.session.get_inputs()[0].shape
             if len(input_shape) >= 4 and isinstance(input_shape[2], int) and isinstance(input_shape[3], int) and input_shape[2] == input_shape[3]:
                 self.input_size = input_shape[2]
+            self.names = parse_model_names(self.session.get_modelmeta().custom_metadata_map.get("names"))
             self.execution_provider = self.session.get_providers()[0]
             self.backend = "onnxruntime"
             return
@@ -182,7 +185,7 @@ class OnnxDetectionModel:
         else:
             self.net.setInput(blob)
             outputs = self.net.forward()
-        return onnx_output_to_detections(outputs, frame.shape, scale, pad_x, pad_y, self.confidence, self.iou)
+        return model_output_to_detections(outputs, frame.shape, scale, pad_x, pad_y, self.confidence, self.iou, self.names)
 
     def describe(self):
         if self.backend == "onnxruntime":
@@ -246,7 +249,20 @@ def numpy_dtype_to_torch_dtype(dtype):
     raise TypeError(f"Unsupported TensorRT tensor dtype: {dtype}")
 
 
-def tensorrt_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold, names):
+def parse_model_names(raw_names):
+    if isinstance(raw_names, str):
+        try:
+            raw_names = ast.literal_eval(raw_names)
+        except (ValueError, SyntaxError):
+            return {}
+    if isinstance(raw_names, dict):
+        return {int(key): str(value) for key, value in raw_names.items()}
+    if isinstance(raw_names, list):
+        return {index: str(value) for index, value in enumerate(raw_names)}
+    return {}
+
+
+def model_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold, names):
     if isinstance(outputs, (list, tuple)):
         if not outputs:
             return []
@@ -257,9 +273,22 @@ def tensorrt_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, con
     predictions = np.asarray(output)
     if predictions.ndim == 3 and predictions.shape[0] == 1:
         predictions = predictions[0]
-    if predictions.ndim != 2 or predictions.shape[1] < 6:
-        return onnx_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold)
+    if predictions.ndim == 2 and predictions.shape[1] == 6:
+        return nms_xyxy_output_to_detections(
+            predictions,
+            frame_shape,
+            scale,
+            pad_x,
+            pad_y,
+            confidence_threshold,
+            iou_threshold,
+            names,
+        )
 
+    return raw_yolo_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold)
+
+
+def nms_xyxy_output_to_detections(predictions, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold, names):
     boxes = []
     confidences = []
     class_ids = []
@@ -303,6 +332,10 @@ def tensorrt_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, con
             }
         )
     return detections
+
+
+def raw_yolo_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold):
+    return onnx_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold)
 
 
 def onnx_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold):
