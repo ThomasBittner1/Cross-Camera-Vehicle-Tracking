@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 
 from config import AppConfig
 from tracking import create_tracker_pair, get_torch_device, tracks_from_model
@@ -34,6 +35,18 @@ def draw_tracks(frame, tracks, color):
         )
 
 
+def draw_fps(frame, fps):
+    cv2.putText(
+        frame,
+        f"FPS {fps:.1f}",
+        (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 255, 255),
+        2,
+    )
+
+
 def run(config=None):
     config = config or AppConfig()
     device = get_torch_device()
@@ -49,6 +62,8 @@ def run(config=None):
     delay_ms = max(1, int(round(1000.0 / fps)))
     paused = False
     original_frames = [None for _ in captures]
+    measured_fps = 0.0
+    previous_frame_time = time.perf_counter()
 
     for window_name in config.window_names:
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -66,10 +81,16 @@ def run(config=None):
                 for frame, mask in zip(frame_pair, masks)
             ]
             tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames)
+            current_frame_time = time.perf_counter()
+            elapsed_seconds = current_frame_time - previous_frame_time
+            previous_frame_time = current_frame_time
+            if elapsed_seconds > 0:
+                measured_fps = 1.0 / elapsed_seconds
 
             for camera_index, tracks in enumerate(tracks_pair):
                 draw_frame = original_frames[camera_index].copy()
                 draw_tracks(draw_frame, tracks, config.display.colors_pair[camera_index])
+                draw_fps(draw_frame, measured_fps)
                 cv2.imshow(config.window_names[camera_index], draw_frame)
 
         key = cv2.waitKey(delay_ms) & 0xFF
