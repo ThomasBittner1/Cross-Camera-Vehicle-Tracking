@@ -1,6 +1,5 @@
 numpy>=1.26
 opencv-contrib-python>=4.9
-ultralytics>=8.0
 onnxruntime>=1.17
 tensorrt-cu12
 boxmot==17.0.0

@@ -1,7 +1,9 @@
 from pathlib import Path
+import json
 
 import cv2
 import numpy as np
+import torch
 
 
 class UltralyticsDetectionModel:
@@ -29,18 +31,86 @@ class TensorRtDetectionModel:
         self.confidence = confidence
         self.iou = iou
         self.input_size = input_size
+        self.names = {}
         try:
-            from ultralytics import YOLO
+            import tensorrt as trt
         except ImportError as error:
-            raise ImportError("TensorRT backend requested, but the 'ultralytics' package is not installed.") from error
-        self.model = YOLO(str(model_path), task="detect")
+            raise ImportError("TensorRT backend requested, but the 'tensorrt' package is not installed.") from error
+
+        if not torch.cuda.is_available():
+            raise RuntimeError("TensorRT backend requires a CUDA-capable PyTorch install.")
+
+        logger = trt.Logger(trt.Logger.INFO)
+        with self.model_path.open("rb") as engine_file, trt.Runtime(logger) as runtime:
+            try:
+                meta_len = int.from_bytes(engine_file.read(4), byteorder="little")
+                metadata = json.loads(engine_file.read(meta_len).decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                engine_file.seek(0)
+                metadata = {}
+
+            self.engine = runtime.deserialize_cuda_engine(engine_file.read())
+
+        if self.engine is None:
+            raise RuntimeError(f"Failed to load TensorRT engine: {self.model_path}")
+
+        raw_names = metadata.get("names", {})
+        self.names = {int(key): str(value) for key, value in raw_names.items()} if isinstance(raw_names, dict) else {}
+        self.context = self.engine.create_execution_context()
+        self.input_name = None
+        self.tensor_names = []
+        self.binding_addresses = {}
+        self.output_names = []
+        self.input_dtype = None
+        self.output_tensors = {}
+
+        for index in range(self.engine.num_io_tensors):
+            name = self.engine.get_tensor_name(index)
+            self.tensor_names.append(name)
+            tensor_mode = self.engine.get_tensor_mode(name)
+            tensor_dtype = trt.nptype(self.engine.get_tensor_dtype(name))
+            tensor_shape = tuple(self.engine.get_tensor_shape(name))
+
+            if tensor_mode == trt.TensorIOMode.INPUT:
+                self.input_name = name
+                self.input_dtype = tensor_dtype
+                if len(tensor_shape) != 4:
+                    raise RuntimeError(f"Expected BCHW TensorRT input, got {name} shape {tensor_shape}")
+                self.input_size = int(tensor_shape[2])
+            else:
+                output_tensor = torch.empty(tensor_shape, device="cuda", dtype=numpy_dtype_to_torch_dtype(tensor_dtype))
+                self.output_names.append(name)
+                self.output_tensors[name] = output_tensor
+                self.binding_addresses[name] = int(output_tensor.data_ptr())
+
+        if self.input_name is None or not self.output_names:
+            raise RuntimeError(f"TensorRT engine has invalid inputs/outputs: {self.model_path}")
 
     def predict(self, frame):
-        results = self.model.predict(frame, verbose=False, conf=self.confidence, iou=self.iou, imgsz=self.input_size, device=0, half=True)
-        return [] if not results else ultralytics_result_to_detections(results[0], frame.shape)
+        input_tensor, scale, pad_x, pad_y = self.preprocess(frame)
+        self.binding_addresses[self.input_name] = int(input_tensor.data_ptr())
+        self.context.execute_v2([self.binding_addresses[name] for name in self.tensor_names])
+        torch.cuda.synchronize()
+        outputs = [self.output_tensors[name].detach().cpu().numpy() for name in self.output_names]
+        return tensorrt_output_to_detections(outputs, frame.shape, scale, pad_x, pad_y, self.confidence, self.iou, self.names)
+
+    def preprocess(self, frame):
+        frame_height, frame_width = frame.shape[:2]
+        scale = min(self.input_size / frame_width, self.input_size / frame_height)
+        resized_width = max(1, int(round(frame_width * scale)))
+        resized_height = max(1, int(round(frame_height * scale)))
+        resized = cv2.resize(frame, (resized_width, resized_height), interpolation=cv2.INTER_LINEAR)
+        canvas = np.full((self.input_size, self.input_size, 3), 114, dtype=np.uint8)
+        pad_x = (self.input_size - resized_width) // 2
+        pad_y = (self.input_size - resized_height) // 2
+        canvas[pad_y:pad_y + resized_height, pad_x:pad_x + resized_width] = resized
+
+        image = canvas[:, :, ::-1].transpose(2, 0, 1)
+        image = np.ascontiguousarray(image[None]).astype(self.input_dtype) / 255.0
+        return torch.from_numpy(image).cuda(), scale, pad_x, pad_y
 
     def describe(self):
-        return f"Detection backend: tensorrt ({self.model_path.name})"
+        return f"Detection backend: tensorrt-direct ({self.model_path.name})"
 
 
 class OnnxDetectionModel:
@@ -164,6 +234,75 @@ def clamp_xyxy_to_frame(xyxy, frame_shape):
     if right <= left or bottom <= top:
         return None
     return (left, top, right, bottom)
+
+
+def numpy_dtype_to_torch_dtype(dtype):
+    if dtype == np.float16:
+        return torch.float16
+    if dtype == np.float32:
+        return torch.float32
+    if dtype == np.int32:
+        return torch.int32
+    raise TypeError(f"Unsupported TensorRT tensor dtype: {dtype}")
+
+
+def tensorrt_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold, names):
+    if isinstance(outputs, (list, tuple)):
+        if not outputs:
+            return []
+        output = outputs[0]
+    else:
+        output = outputs
+
+    predictions = np.asarray(output)
+    if predictions.ndim == 3 and predictions.shape[0] == 1:
+        predictions = predictions[0]
+    if predictions.ndim != 2 or predictions.shape[1] < 6:
+        return onnx_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold)
+
+    boxes = []
+    confidences = []
+    class_ids = []
+    for row in predictions:
+        confidence = float(row[4])
+        if confidence < confidence_threshold:
+            continue
+
+        x1 = (float(row[0]) - pad_x) / scale
+        y1 = (float(row[1]) - pad_y) / scale
+        x2 = (float(row[2]) - pad_x) / scale
+        y2 = (float(row[3]) - pad_y) / scale
+        bounds = clamp_xyxy_to_frame((x1, y1, x2, y2), frame_shape)
+        if bounds is None:
+            continue
+
+        left, top, right, bottom = bounds
+        boxes.append([left, top, right - left, bottom - top])
+        confidences.append(confidence)
+        class_ids.append(int(row[5]))
+
+    if not boxes:
+        return []
+
+    kept_indices = cv2.dnn.NMSBoxes(boxes, confidences, confidence_threshold, iou_threshold)
+    if kept_indices is None or len(kept_indices) == 0:
+        return []
+
+    detections = []
+    for kept_index in np.array(kept_indices).reshape(-1):
+        index = int(kept_index)
+        left, top, width, height = boxes[index]
+        class_id = class_ids[index]
+        detections.append(
+            {
+                "bounds": (left, top, left + width, top + height),
+                "confidence": float(confidences[index]),
+                "class_id": class_id,
+                "track_id": None,
+                "label": names.get(class_id, str(class_id)),
+            }
+        )
+    return detections
 
 
 def onnx_output_to_detections(outputs, frame_shape, scale, pad_x, pad_y, confidence_threshold, iou_threshold):
