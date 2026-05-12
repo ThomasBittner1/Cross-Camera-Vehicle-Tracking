@@ -39,6 +39,18 @@ def draw_fps(frame, fps):
     cv2.putText(
         frame,
         f"FPS {fps:.1f}",
+        (10, 58),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 255, 255),
+        2,
+    )
+
+
+def draw_frame_count(frame, current_frame_index):
+    cv2.putText(
+        frame,
+        f"Frame {current_frame_index}",
         (10, 30),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.8,
@@ -62,6 +74,7 @@ def run(config=None):
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
     delay_ms = 1 #max(1, int(round(1000.0 / fps)))
     paused = False
+    current_frame_index = config.start_frame_index
     original_frames = [None for _ in captures]
     measured_fps = 0.0
     previous_frame_time = time.perf_counter()
@@ -91,6 +104,7 @@ def run(config=None):
             for camera_index, tracks in enumerate(tracks_pair):
                 draw_frame = original_frames[camera_index].copy()
                 draw_tracks(draw_frame, tracks, config.display.colors_pair[camera_index])
+                draw_frame_count(draw_frame, current_frame_index)
                 draw_fps(draw_frame, measured_fps)
                 cv2.imshow(config.window_names[camera_index], draw_frame)
 
@@ -99,6 +113,9 @@ def run(config=None):
             break
         if key == ord(" "):
             paused = not paused
+
+        if not paused:
+            current_frame_index += 1
 
     for cap in captures:
         cap.release()
