@@ -146,7 +146,7 @@ def run(config=None):
         cap.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame_index)
 
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
-    delay_ms = max(1, int(round(1000.0 / fps)))
+    delay_ms = 1 # max(1, int(round(1000.0 / fps)))
     masks = _create_masks(captures, config.mask_points_pair)
     trackers = create_tracker_pair(config.model_path, device)
 
