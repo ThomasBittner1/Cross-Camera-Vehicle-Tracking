@@ -1,0 +1,87 @@
+import cv2
+import numpy as np
+
+from config import AppConfig
+from tracking import create_tracker_pair, get_torch_device, tracks_from_model
+from yolo import load_detection_model
+
+
+def create_masks(captures, mask_points_pair):
+    masks = []
+    for camera_index, cap in enumerate(captures):
+        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        mask = np.full((frame_height, frame_width, 3), 255, dtype=np.uint8)
+        points = np.array(mask_points_pair[camera_index], dtype=np.int32)
+        cv2.fillPoly(mask, [points], (0, 0, 0))
+        masks.append(mask)
+    return masks
+
+
+def draw_tracks(frame, tracks, color):
+    for track in tracks:
+        x1, y1, x2, y2 = map(int, track[:4])
+        track_id = int(track[4])
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(
+            frame,
+            f"ID {track_id}",
+            (x1, max(20, y1 - 5)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2,
+        )
+
+
+def run(config=None):
+    config = config or AppConfig()
+    device = get_torch_device()
+    model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
+    trackers = create_tracker_pair(config.model_path, device)
+
+    captures = [cv2.VideoCapture(video_path) for video_path in config.video_paths]
+    for cap in captures:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame_index)
+
+    masks = create_masks(captures, config.mask_points_pair)
+    fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
+    delay_ms = max(1, int(round(1000.0 / fps)))
+    paused = False
+    original_frames = [None for _ in captures]
+
+    for window_name in config.window_names:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+
+    while True:
+        if not paused:
+            ret_and_frame_pair = [cap.read() for cap in captures]
+            if not all(ret for ret, _ in ret_and_frame_pair):
+                break
+
+            frame_pair = [frame for _, frame in ret_and_frame_pair]
+            original_frames = [frame.copy() for frame in frame_pair]
+            masked_frame_pair = [
+                cv2.bitwise_and(frame, mask)
+                for frame, mask in zip(frame_pair, masks)
+            ]
+            tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames)
+
+            for camera_index, tracks in enumerate(tracks_pair):
+                draw_frame = original_frames[camera_index].copy()
+                draw_tracks(draw_frame, tracks, config.display.colors_pair[camera_index])
+                cv2.imshow(config.window_names[camera_index], draw_frame)
+
+        key = cv2.waitKey(delay_ms) & 0xFF
+        if key == ord("q"):
+            break
+        if key == ord(" "):
+            paused = not paused
+
+    for cap in captures:
+        cap.release()
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    run()
