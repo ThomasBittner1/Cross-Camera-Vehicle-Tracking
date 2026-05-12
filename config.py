@@ -14,7 +14,8 @@ class DisplayConfig:
 @dataclass(frozen=True)
 class AppConfig:
     start_frame_index: int = 0
-    model_path: Path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train\weights\best.pt")
+    # model_path: Path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train\weights\best.pt")
+    model_path: Path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train\weights\best.engine")
     window_names: tuple[str, str] = ("c042", "c041")
     video_paths: tuple[str, str] = (
         r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",

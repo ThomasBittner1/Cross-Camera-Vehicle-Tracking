@@ -50,6 +50,7 @@ def draw_fps(frame, fps):
 def run(config=None):
     config = config or AppConfig()
     device = get_torch_device()
+    print(f"Using device: {device}")
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
     trackers = create_tracker_pair(config.model_path, device)
 
