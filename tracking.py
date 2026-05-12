@@ -19,7 +19,7 @@ def create_tracker_pair(model_path, device, frame_rate=30):
             match_thresh=0.8,
             proximity_thresh=0.5,
             appearance_thresh=0.8,
-            cmc_method="sof",
+            cmc_method=None, #"sof",
             frame_rate=frame_rate,
         )
         for _ in range(2)

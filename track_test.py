@@ -60,7 +60,7 @@ def run(config=None):
 
     masks = create_masks(captures, config.mask_points_pair)
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
-    delay_ms = max(1, int(round(1000.0 / fps)))
+    delay_ms = 1 #max(1, int(round(1000.0 / fps)))
     paused = False
     original_frames = [None for _ in captures]
     measured_fps = 0.0
