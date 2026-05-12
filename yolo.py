@@ -62,6 +62,7 @@ class TensorRtDetectionModel:
         self.binding_addresses = {}
         self.output_names = []
         self.input_dtype = None
+        self.batch_size = 1
         self.output_tensors = {}
 
         for index in range(self.engine.num_io_tensors):
@@ -76,6 +77,7 @@ class TensorRtDetectionModel:
                 self.input_dtype = tensor_dtype
                 if len(tensor_shape) != 4:
                     raise RuntimeError(f"Expected BCHW TensorRT input, got {name} shape {tensor_shape}")
+                self.batch_size = int(tensor_shape[0])
                 self.input_size = int(tensor_shape[2])
             else:
                 output_tensor = torch.empty(tensor_shape, device="cuda", dtype=numpy_dtype_to_torch_dtype(tensor_dtype))
@@ -87,14 +89,59 @@ class TensorRtDetectionModel:
             raise RuntimeError(f"TensorRT engine has invalid inputs/outputs: {self.model_path}")
 
     def predict(self, frame):
-        input_tensor, scale, pad_x, pad_y = self.preprocess(frame)
+        return self.predict_many([frame])[0]
+
+    def predict_many(self, frames):
+        if not frames:
+            return []
+
+        results = []
+        for start_index in range(0, len(frames), self.batch_size):
+            batch_frames = frames[start_index:start_index + self.batch_size]
+            results.extend(self._predict_batch(batch_frames))
+        return results
+
+    def _predict_batch(self, frames):
+        input_tensor, preprocess_data = self.preprocess_batch(frames)
         self.binding_addresses[self.input_name] = int(input_tensor.data_ptr())
         self.context.execute_v2([self.binding_addresses[name] for name in self.tensor_names])
         torch.cuda.synchronize()
         outputs = [self.output_tensors[name].detach().cpu().numpy() for name in self.output_names]
-        return model_output_to_detections(outputs, frame.shape, scale, pad_x, pad_y, self.confidence, self.iou, self.names)
+        detections = []
+        for frame_index, (frame, scale, pad_x, pad_y) in enumerate(preprocess_data):
+            frame_outputs = [output[frame_index:frame_index + 1] for output in outputs]
+            detections.append(
+                model_output_to_detections(
+                    frame_outputs,
+                    frame.shape,
+                    scale,
+                    pad_x,
+                    pad_y,
+                    self.confidence,
+                    self.iou,
+                    self.names,
+                )
+            )
+        return detections
 
     def preprocess(self, frame):
+        image, scale, pad_x, pad_y = self.preprocess_frame(frame)
+        return torch.from_numpy(image[None]).cuda(), scale, pad_x, pad_y
+
+    def preprocess_batch(self, frames):
+        images = []
+        preprocess_data = []
+        for frame in frames:
+            image, scale, pad_x, pad_y = self.preprocess_frame(frame)
+            images.append(image)
+            preprocess_data.append((frame, scale, pad_x, pad_y))
+
+        while len(images) < self.batch_size:
+            images.append(images[-1].copy())
+
+        return torch.from_numpy(np.stack(images, axis=0)).cuda(), preprocess_data
+
+    def preprocess_frame(self, frame):
         frame_height, frame_width = frame.shape[:2]
         scale = min(self.input_size / frame_width, self.input_size / frame_height)
         resized_width = max(1, int(round(frame_width * scale)))
@@ -106,8 +153,8 @@ class TensorRtDetectionModel:
         canvas[pad_y:pad_y + resized_height, pad_x:pad_x + resized_width] = resized
 
         image = canvas[:, :, ::-1].transpose(2, 0, 1)
-        image = np.ascontiguousarray(image[None]).astype(self.input_dtype) / 255.0
-        return torch.from_numpy(image).cuda(), scale, pad_x, pad_y
+        image = np.ascontiguousarray(image).astype(self.input_dtype) / 255.0
+        return image, scale, pad_x, pad_y
 
     def describe(self):
         return f"Detection backend: tensorrt-direct ({self.model_path.name})"

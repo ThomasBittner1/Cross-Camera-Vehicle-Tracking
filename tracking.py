@@ -53,7 +53,10 @@ def tracks_from_detections(detections, tracker, frame):
 
 
 def tracks_from_model(model, frames, trackers, original_frames):
-    detection_pair = [model.predict(frame) for frame in frames]
+    if hasattr(model, "predict_many"):
+        detection_pair = model.predict_many(frames)
+    else:
+        detection_pair = [model.predict(frame) for frame in frames]
     return [
         tracks_from_detections(detection_pair[camera_index], trackers[camera_index], original_frames[camera_index])
         for camera_index in range(len(detection_pair))
