@@ -5,11 +5,11 @@ import torch
 from boxmot import BotSort
 
 
-def create_tracker_pair(model_path, device, frame_rate=30):
+def create_tracker_pair(model_path, frame_rate=30):
     return [
         BotSort(
             reid_weights=Path(model_path),
-            device=device,
+            device=get_torch_device(),
             half=False,
             with_reid=False,
             track_high_thresh=0.25,

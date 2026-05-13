@@ -3,7 +3,7 @@ import numpy as np
 import time
 
 from config import AppConfig
-from tracking import create_tracker_pair, get_torch_device, tracks_from_model
+from tracking import create_tracker_pair, tracks_from_detections
 from yolo import load_detection_model
 
 
@@ -35,6 +35,12 @@ def draw_tracks(frame, tracks, color):
         )
 
 
+def draw_detections(frame, detections, color=(0, 255, 255)):
+    for detection in detections:
+        x1, y1, x2, y2 = detection["bounds"]
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+
 def draw_fps(frame, fps):
     cv2.putText(
         frame,
@@ -61,10 +67,8 @@ def draw_frame_count(frame, current_frame_index):
 
 def run(config=None):
     config = config or AppConfig()
-    device = get_torch_device()
-    print(f"Using device: {device}")
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
-    trackers = create_tracker_pair(config.model_path, device)
+    trackers = create_tracker_pair(config.model_path)
 
     captures = [cv2.VideoCapture(video_path) for video_path in config.video_paths]
     for cap in captures:
@@ -94,7 +98,14 @@ def run(config=None):
                 cv2.bitwise_and(frame, mask)
                 for frame, mask in zip(frame_pair, masks)
             ]
-            tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames)
+            if hasattr(model, "predict_many"):
+                detection_pair = model.predict_many(masked_frame_pair)
+            else:
+                detection_pair = [model.predict(frame) for frame in masked_frame_pair]
+            tracks_pair = [
+                tracks_from_detections(detection_pair[camera_index], trackers[camera_index], original_frames[camera_index])
+                for camera_index in range(len(detection_pair))
+            ]
             current_frame_time = time.perf_counter()
             elapsed_seconds = current_frame_time - previous_frame_time
             previous_frame_time = current_frame_time
@@ -103,6 +114,7 @@ def run(config=None):
 
             for camera_index, tracks in enumerate(tracks_pair):
                 draw_frame = original_frames[camera_index].copy()
+                draw_detections(draw_frame, detection_pair[camera_index])
                 draw_tracks(draw_frame, tracks, config.display.colors_pair[camera_index])
                 draw_frame_count(draw_frame, current_frame_index)
                 draw_fps(draw_frame, measured_fps)

@@ -6,7 +6,7 @@ import embedding_utils
 import geometry_utils
 from config import AppConfig
 from reid_gallery import ReidGallery
-from tracking import create_tracker_pair, get_torch_device, tracks_from_model
+from tracking import create_tracker_pair, tracks_from_model
 from visualization import Visualizer
 from yolo import load_detection_model
 
@@ -129,7 +129,6 @@ def _process_track(
 
 def run(config=None):
     config = config or AppConfig()
-    device = get_torch_device()
     embedder = embedding_utils.EmbeddingGenerator()
     reid_gallery = ReidGallery(embedder, config.not_from_other_camera_masks_camera_1)
     visualizer = Visualizer(config)
@@ -150,7 +149,7 @@ def run(config=None):
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
     delay_ms = max(1, int(round(1000.0 / fps)))
     masks = _create_masks(captures, config.mask_points_pair)
-    trackers = create_tracker_pair(config.model_path, device)
+    trackers = create_tracker_pair(config.model_path)
 
     paused = False
     current_frame_index = config.start_frame_index
