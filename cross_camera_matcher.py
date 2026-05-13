@@ -45,13 +45,11 @@ class CrossCameraMatcher:
                 self.best_matches_query[track_id].sort(key=lambda x: x["embedding_score"], reverse=True)
             return self.best_matches_query
         else:
-            return {
-                track_id: sorted(crossed_matches, key=lambda x: x["global_score"], reverse=True)
-                for track_id, matches in self.best_matches_query.items()
-                if (crossed_matches := [match_data for match_data in matches
-                                        if match_data.get("elapsed_time", -1.0) != -1.0
-                                        and "elapsed_time_score" in match_data])
-            }
+            return_best_matches = {}
+            for track_id, matches in self.best_matches_query.items():
+                if "elapsed_time_score" in matches[0]:
+                    return_best_matches[track_id] = sorted(matches, key=lambda x:x["global_score"], reverse=True)
+            return return_best_matches
 
 
     def store_query_camera_embeddings(self, tracks, frame):

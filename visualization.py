@@ -94,7 +94,7 @@ class Visualizer:
             other_draw_crop = match_data["other_draw_crop"]
             other_label = (
                 f"{match_data['other_track_id']} "
-                f"score:{match_data['embedding_score']:.2f} / {match_data['elapsed_time_score']:.1f} ({match_data['elapsed_time']:.1f}) / {match_data['global_score']:.2f}")
+                f"score: {match_data['embedding_score']:.2f} / {match_data['elapsed_time_score']:.1f} ({match_data['elapsed_time']:.1f}) / {match_data['global_score']:.2f}")
 
             crop_h, crop_w = other_draw_crop.shape[:2]
             box_w = max(1, x2 - x1)

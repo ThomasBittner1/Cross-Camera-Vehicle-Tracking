@@ -13,7 +13,7 @@ class DisplayConfig:
 
 @dataclass(frozen=True)
 class AppConfig:
-    start_frame_index: int = 0
+    start_frame_index: int = 1000
     # model_path: Path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train\weights\best.pt")
     model_path: Path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train2\weights\best.engine")
     window_names: tuple[str, str] = ("c042", "c041")
