@@ -171,7 +171,7 @@ def run(config=None):
                 for frame, mask in zip(frame_pair, masks)
             ]
 
-            tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames)
+            tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames, include_unconfirmed=True)
             current_frame_time = time.perf_counter()
             elapsed_seconds = current_frame_time - previous_frame_time
             previous_frame_time = current_frame_time

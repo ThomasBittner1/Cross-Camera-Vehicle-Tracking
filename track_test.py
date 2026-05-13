@@ -39,6 +39,16 @@ def draw_detections(frame, detections, color=(0, 255, 255)):
     for detection in detections:
         x1, y1, x2, y2 = detection["bounds"]
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(
+            frame,
+            f"{detection['confidence']:.2f}",
+            (x1, min(frame.shape[0] - 10, y2 + 20)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
 
 
 def draw_fps(frame, fps):
@@ -103,7 +113,12 @@ def run(config=None):
             else:
                 detection_pair = [model.predict(frame) for frame in masked_frame_pair]
             tracks_pair = [
-                tracks_from_detections(detection_pair[camera_index], trackers[camera_index], original_frames[camera_index])
+                tracks_from_detections(
+                    detection_pair[camera_index],
+                    trackers[camera_index],
+                    original_frames[camera_index],
+                    include_unconfirmed=True,
+                )
                 for camera_index in range(len(detection_pair))
             ]
             current_frame_time = time.perf_counter()

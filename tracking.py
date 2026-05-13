@@ -37,7 +37,7 @@ def tracks_from_prediction(result, tracker, frame):
     return tracker.update(detections, frame)
 
 
-def tracks_from_detections(detections, tracker, frame):
+def tracks_from_detections(detections, tracker, frame, include_unconfirmed=False):
     if not detections:
         return np.empty((0, 8), dtype=np.float32)
 
@@ -49,16 +49,36 @@ def tracks_from_detections(detections, tracker, frame):
         ]
         for detection in detections
     ]
-    return tracker.update(np.array(tracker_inputs, dtype=np.float32), frame)
+    tracks = tracker.update(np.array(tracker_inputs, dtype=np.float32), frame)
+    if not include_unconfirmed:
+        return tracks
+
+    unconfirmed_tracks = [
+        [*track.xyxy, track.id, track.conf, track.cls, track.det_ind]
+        for track in getattr(tracker, "active_tracks", [])
+        if not getattr(track, "is_activated", True)
+    ]
+    if not unconfirmed_tracks:
+        return tracks
+
+    unconfirmed_tracks = np.asarray(unconfirmed_tracks, dtype=np.float32)
+    if tracks.size == 0:
+        return unconfirmed_tracks
+    return np.vstack([tracks, unconfirmed_tracks]).astype(np.float32)
 
 
-def tracks_from_model(model, frames, trackers, original_frames):
+def tracks_from_model(model, frames, trackers, original_frames, skip_unconfirmed=True):
     if hasattr(model, "predict_many"):
         detection_pair = model.predict_many(frames)
     else:
         detection_pair = [model.predict(frame) for frame in frames]
     return [
-        tracks_from_detections(detection_pair[camera_index], trackers[camera_index], original_frames[camera_index])
+        tracks_from_detections(
+            detection_pair[camera_index],
+            trackers[camera_index],
+            original_frames[camera_index],
+            skip_unconfirmed=skip_unconfirmed,
+        )
         for camera_index in range(len(detection_pair))
     ]
 
