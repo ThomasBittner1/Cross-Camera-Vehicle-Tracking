@@ -5,7 +5,7 @@ import torch
 from boxmot import BotSort
 
 
-def create_tracker_pair(model_path, frame_rate=30):
+def create_trackers_by_camera(model_path, frame_rate=30):
     return [
         BotSort(
             reid_weights=Path(model_path),
@@ -67,17 +67,17 @@ def tracks_from_detections(detections, tracker, frame, include_unconfirmed=False
 
 def tracks_from_model(model, frames, trackers, original_frames, include_unconfirmed=True):
     if hasattr(model, "predict_many"):
-        detection_pair = model.predict_many(frames)
+        detections_by_camera = model.predict_many(frames)
     else:
-        detection_pair = [model.predict(frame) for frame in frames]
+        detections_by_camera = [model.predict(frame) for frame in frames]
     return [
         tracks_from_detections(
-            detection_pair[camera_index],
+            detections_by_camera[camera_index],
             trackers[camera_index],
             original_frames[camera_index],
             include_unconfirmed=include_unconfirmed,
         )
-        for camera_index in range(len(detection_pair))
+        for camera_index in range(len(detections_by_camera))
     ]
 
 

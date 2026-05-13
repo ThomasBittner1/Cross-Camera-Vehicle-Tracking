@@ -17,11 +17,11 @@ class Visualizer:
         elif key in (ord("o"), ord("O")):
             self.show_not_from_other_camera_area = not self.show_not_from_other_camera_area
 
-    def draw(self, original_frames, frame_draw_data_pair, isolated_track_id_pair, best_matches_1):
+    def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, best_matches_1):
         for camera_index in [0, 1]:
             draw_frame = original_frames[camera_index].copy()
-            draw_data = frame_draw_data_pair[camera_index]
-            isolated_track_id = isolated_track_id_pair[camera_index]
+            draw_data = frame_draw_data_by_camera[camera_index]
+            isolated_track_id = isolated_track_id_by_camera[camera_index]
 
             self._draw_overlays(camera_index, draw_frame)
             cv2.line(draw_frame, draw_data["line"][0], draw_data["line"][1], (0, 0, 255), 2)
@@ -54,7 +54,7 @@ class Visualizer:
             overlay = draw_frame.copy()
             cv2.fillPoly(
                 overlay,
-                [np.array(self.config.mask_points_pair[camera_index], dtype=np.int32)],
+                [np.array(self.config.mask_points_by_camera[camera_index], dtype=np.int32)],
                 display.inference_ignore_area_color,
             )
             cv2.addWeighted(
@@ -156,7 +156,7 @@ class Visualizer:
                 (paste_x1 + max(0, text_x), paste_y1 + text_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
-                self.config.display.colors_pair[0],
+                self.config.display.colors_by_camera[0],
                 2,
             )
 

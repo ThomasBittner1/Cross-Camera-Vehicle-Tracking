@@ -119,7 +119,7 @@ class ReidGallery:
             self.embedding_of_crossed_0[index] = self.embeddings_of_crossed_per_id_0[other_track_id]
             self.embedding_of_crossed_0_map.append(other_track_id)
 
-    def update_camera_1_matches(self, track_id, crossed_times_pair):
+    def update_camera_1_matches(self, track_id, crossed_times_by_camera):
         is_overlapping = self.camera_1_overlap_by_track_id.get(track_id)
         if is_overlapping or not self.embedding_histories_1[track_id]:
             return
@@ -140,19 +140,19 @@ class ReidGallery:
             other_draw_crop = self._best_crop_for_camera_0_track(other_track_id)
 
             elapsed_time = -1.0
-            if track_id in crossed_times_pair[1]:
-                elapsed_time = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
+            if track_id in crossed_times_by_camera[1]:
+                elapsed_time = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
 
             self._upsert_match(track_id, other_track_id, embedding_score, other_draw_crop, elapsed_time)
 
-    def update_elapsed_times(self, track_id, crossed_times_pair):
-        if track_id not in self.best_matches_1 or track_id not in crossed_times_pair[1]:
+    def update_elapsed_times(self, track_id, crossed_times_by_camera):
+        if track_id not in self.best_matches_1 or track_id not in crossed_times_by_camera[1]:
             return
 
         for match_data in self.best_matches_1[track_id]:
             if match_data["elapsed_time"] == -1.0:
                 other_track_id = match_data["other_track_id"]
-                match_data["elapsed_time"] = crossed_times_pair[1][track_id] - crossed_times_pair[0][other_track_id]
+                match_data["elapsed_time"] = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
 
         self.best_matches_1[track_id].sort(key=lambda x: x["embedding_score"], reverse=True)
 

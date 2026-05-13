@@ -3,17 +3,17 @@ import numpy as np
 import time
 
 from config import AppConfig
-from tracking import create_tracker_pair, tracks_from_detections
+from tracking import create_trackers_by_camera, tracks_from_detections
 from yolo import load_detection_model
 
 
-def create_masks(captures, mask_points_pair):
+def create_masks(captures, mask_points_by_camera):
     masks = []
     for camera_index, cap in enumerate(captures):
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         mask = np.full((frame_height, frame_width, 3), 255, dtype=np.uint8)
-        points = np.array(mask_points_pair[camera_index], dtype=np.int32)
+        points = np.array(mask_points_by_camera[camera_index], dtype=np.int32)
         cv2.fillPoly(mask, [points], (0, 0, 0))
         masks.append(mask)
     return masks
@@ -78,13 +78,13 @@ def draw_frame_count(frame, current_frame_index):
 def run(config=None):
     config = config or AppConfig()
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
-    trackers = create_tracker_pair(config.model_path)
+    trackers = create_trackers_by_camera(config.model_path)
 
     captures = [cv2.VideoCapture(video_path) for video_path in config.video_paths]
     for cap in captures:
         cap.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame_index)
 
-    masks = create_masks(captures, config.mask_points_pair)
+    masks = create_masks(captures, config.mask_points_by_camera)
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
     delay_ms = 1 #max(1, int(round(1000.0 / fps)))
     paused = False
@@ -101,28 +101,28 @@ def run(config=None):
         processed_frame = False
         if not paused or step_next_frame:
             step_next_frame = False
-            ret_and_frame_pair = [cap.read() for cap in captures]
-            if not all(ret for ret, _ in ret_and_frame_pair):
+            ret_and_frame_by_camera = [cap.read() for cap in captures]
+            if not all(ret for ret, _ in ret_and_frame_by_camera):
                 break
 
-            frame_pair = [frame for _, frame in ret_and_frame_pair]
-            original_frames = [frame.copy() for frame in frame_pair]
-            masked_frame_pair = [
+            frame_by_camera = [frame for _, frame in ret_and_frame_by_camera]
+            original_frames = [frame.copy() for frame in frame_by_camera]
+            masked_frame_by_camera = [
                 cv2.bitwise_and(frame, mask)
-                for frame, mask in zip(frame_pair, masks)
+                for frame, mask in zip(frame_by_camera, masks)
             ]
             if hasattr(model, "predict_many"):
-                detection_pair = model.predict_many(masked_frame_pair)
+                detections_by_camera = model.predict_many(masked_frame_by_camera)
             else:
-                detection_pair = [model.predict(frame) for frame in masked_frame_pair]
-            tracks_pair = [
+                detections_by_camera = [model.predict(frame) for frame in masked_frame_by_camera]
+            tracks_by_camera = [
                 tracks_from_detections(
-                    detection_pair[camera_index],
+                    detections_by_camera[camera_index],
                     trackers[camera_index],
                     original_frames[camera_index],
                     include_unconfirmed=False,
                 )
-                for camera_index in range(len(detection_pair))
+                for camera_index in range(len(detections_by_camera))
             ]
             current_frame_time = time.perf_counter()
             elapsed_seconds = current_frame_time - previous_frame_time
@@ -130,10 +130,10 @@ def run(config=None):
             if elapsed_seconds > 0:
                 measured_fps = 1.0 / elapsed_seconds
 
-            for camera_index, tracks in enumerate(tracks_pair):
+            for camera_index, tracks in enumerate(tracks_by_camera):
                 draw_frame = original_frames[camera_index].copy()
-                draw_detections(draw_frame, detection_pair[camera_index])
-                draw_tracks(draw_frame, tracks, config.display.colors_pair[camera_index])
+                draw_detections(draw_frame, detections_by_camera[camera_index])
+                draw_tracks(draw_frame, tracks, config.display.colors_by_camera[camera_index])
                 draw_frame_count(draw_frame, current_frame_index)
                 draw_fps(draw_frame, measured_fps)
                 cv2.imshow(config.window_names[camera_index], draw_frame)

@@ -4,7 +4,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class DisplayConfig:
-    colors_pair: tuple[tuple[int, int, int], tuple[int, int, int]] = ((255, 0, 0), (0, 255, 0))
+    colors_by_camera: tuple[tuple[int, int, int], tuple[int, int, int]] = ((255, 0, 0), (0, 255, 0))
     inference_ignore_area_color: tuple[int, int, int] = (255, 0, 0)
     inference_ignore_area_alpha: float = 0.5
     not_from_other_camera_area_color: tuple[int, int, int] = (0, 0, 255)
@@ -25,7 +25,7 @@ class AppConfig:
         ((773, 175), (953, 256)),
         ((227, 283), (731, 956)),
     )
-    mask_points_pair: tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]] = (
+    mask_points_by_camera: tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]] = (
         (
             (1278, 493), (961, 256), (1101, 163), (1027, 101), (881, 126), (684, 165),
             (499, 128), (304, 142), (168, 145), (7, 222), (57, 290), (2, 352),
