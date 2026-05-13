@@ -26,7 +26,7 @@ def draw_tracks(frame, tracks, color):
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
         cv2.putText(
             frame,
-            f"ID {track_id}",
+            f"{track_id}",
             (x1, max(20, y1 - 5)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,

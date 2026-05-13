@@ -99,7 +99,7 @@ def run(config=None):
     paused = False
     step_next_frame = False
     current_frame_index = config.start_frame_index
-    pause_at_frame_index = 1500
+    pause_at_frame_index = 1450
     paused_at_target_frame = False
     original_frames = [None, None]
     measured_fps = 0.0
@@ -146,7 +146,7 @@ def run(config=None):
                         continue
 
                     x1, y1, x2, y2 = map(int, track[:4])
-                    label = f"ID {track_id}"
+                    label = f"{track_id}"
                     is_good_crop = False
 
                     if _track_crossed_line(track, previous_centers_by_camera[camera_index], config.cross_lines[camera_index]):

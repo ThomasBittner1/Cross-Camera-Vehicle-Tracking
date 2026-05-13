@@ -46,7 +46,7 @@ class CrossCameraMatcher:
             return self.best_matches_query
         else:
             return {
-                track_id: sorted(crossed_matches, key=lambda x: x["elapsed_time_score"], reverse=True)
+                track_id: sorted(crossed_matches, key=lambda x: x["global_score"], reverse=True)
                 for track_id, matches in self.best_matches_query.items()
                 if (crossed_matches := [match_data for match_data in matches
                                         if match_data.get("elapsed_time", -1.0) != -1.0
@@ -163,7 +163,7 @@ class CrossCameraMatcher:
                     if elapsed_time != -1.0:
                         match_data["elapsed_time"] = elapsed_time
                     match_got_updated = True
-                    self._update_global_scores(match_data)
+                    self._recalculate_scores(match_data)
                     break
 
             if not match_got_updated:
@@ -173,7 +173,7 @@ class CrossCameraMatcher:
                     "other_track_id": other_track_id,
                     "elapsed_time": elapsed_time,
                 }
-                self._update_global_scores(match_data)
+                self._recalculate_scores(match_data)
                 self.best_matches_query[track_id].append(match_data)
 
     def update_query_camera_elapsed_times(self, track_id, crossed_times_by_camera):
@@ -185,10 +185,10 @@ class CrossCameraMatcher:
                 other_track_id = match_data["other_track_id"]
                 elapsed_time = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
                 match_data["elapsed_time"] = elapsed_time
-                self._update_global_scores(match_data)
+                self._recalculate_scores(match_data)
 
 
-    def _update_global_scores(self, match_data):
+    def _recalculate_scores(self, match_data):
         elapsed_time = match_data.get("elapsed_time", -1.0)
         if elapsed_time != -1.0:
             match_data["elapsed_time_score"] = np.interp(
