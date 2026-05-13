@@ -45,7 +45,7 @@ class Visualizer:
                 if camera_index == 1 and box["track_id"] in best_matches_1:
                     self._draw_match_panel(draw_frame, box, best_matches_1[box["track_id"]])
 
-            self._draw_legend(draw_frame, draw_data["frame_text"])
+            self._draw_legend(draw_frame, draw_data["frame_text"], draw_data["fps_text"])
             cv2.imshow(self.config.window_names[camera_index], draw_frame)
 
     def _draw_overlays(self, camera_index, draw_frame):
@@ -160,9 +160,10 @@ class Visualizer:
                 2,
             )
 
-    def _draw_legend(self, draw_frame, frame_text):
+    def _draw_legend(self, draw_frame, frame_text, fps_text):
         legend_lines = [
             frame_text,
+            fps_text,
             (
                 f"0-9: matches ({self.num_other_matches_to_show})  "
                 f"M: inference-ignore ({'on' if self.show_inference_ignore_area else 'off'})  "

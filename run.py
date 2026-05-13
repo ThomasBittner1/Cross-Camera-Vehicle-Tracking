@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 
 import embedding_utils
 import geometry_utils
@@ -22,12 +23,13 @@ def _create_masks(captures, mask_points_pair):
     return masks
 
 
-def _build_draw_data(camera_index, config, current_frame_index):
+def _build_draw_data(camera_index, config, current_frame_index, measured_fps):
     return {
         "boxes": [],
         "others": [],
         "line": config.cross_lines[camera_index],
         "frame_text": f"Frame {current_frame_index}",
+        "fps_text": f"FPS {measured_fps:.1f}",
     }
 
 
@@ -146,13 +148,15 @@ def run(config=None):
         cap.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame_index)
 
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
-    delay_ms = 1 # max(1, int(round(1000.0 / fps)))
+    delay_ms = max(1, int(round(1000.0 / fps)))
     masks = _create_masks(captures, config.mask_points_pair)
     trackers = create_tracker_pair(config.model_path, device)
 
     paused = False
     current_frame_index = config.start_frame_index
     original_frames = [None, None]
+    measured_fps = 0.0
+    previous_frame_time = time.perf_counter()
 
     while True:
         if not paused:
@@ -169,11 +173,16 @@ def run(config=None):
             ]
 
             tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames)
+            current_frame_time = time.perf_counter()
+            elapsed_seconds = current_frame_time - previous_frame_time
+            previous_frame_time = current_frame_time
+            if elapsed_seconds > 0:
+                measured_fps = 1.0 / elapsed_seconds
 
             reid_gallery.prepare_camera_1_tracks(tracks_pair[1], original_frames[1])
 
             for camera_index in [0, 1]:
-                draw_data = _build_draw_data(camera_index, config, current_frame_index)
+                draw_data = _build_draw_data(camera_index, config, current_frame_index, measured_fps)
                 one_or_more_cars_just_crossed = False
 
                 for track in tracks_pair[camera_index]:
@@ -203,7 +212,7 @@ def run(config=None):
 
         _handle_pending_clicks(pending_click_pair, isolated_track_id_pair, frame_draw_data_pair)
 
-        key = cv2.waitKey(delay_ms) & 0xFF
+        key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
             break
         if key == ord(" "):
