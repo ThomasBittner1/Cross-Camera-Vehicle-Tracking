@@ -88,6 +88,7 @@ def run(config=None):
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
     delay_ms = 1 #max(1, int(round(1000.0 / fps)))
     paused = False
+    step_next_frame = False
     current_frame_index = config.start_frame_index
     original_frames = [None for _ in captures]
     measured_fps = 0.0
@@ -97,7 +98,9 @@ def run(config=None):
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     while True:
-        if not paused:
+        processed_frame = False
+        if not paused or step_next_frame:
+            step_next_frame = False
             ret_and_frame_pair = [cap.read() for cap in captures]
             if not all(ret for ret, _ in ret_and_frame_pair):
                 break
@@ -134,14 +137,18 @@ def run(config=None):
                 draw_frame_count(draw_frame, current_frame_index)
                 draw_fps(draw_frame, measured_fps)
                 cv2.imshow(config.window_names[camera_index], draw_frame)
+            processed_frame = True
 
-        key = cv2.waitKey(delay_ms) & 0xFF
-        if key == ord("q"):
+        key = cv2.waitKeyEx(delay_ms)
+        key_code = key & 0xFF
+        if key_code == ord("q"):
             break
-        if key == ord(" "):
+        if key_code == ord(" "):
             paused = not paused
+        elif paused and key in (83, 63235, 65363, 2555904):
+            step_next_frame = True
 
-        if not paused:
+        if processed_frame:
             current_frame_index += 1
 
     for cap in captures:

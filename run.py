@@ -150,6 +150,7 @@ def run(config=None):
 
     while True:
         processed_frame = False
+
         if not paused or step_next_frame:
             step_next_frame = False
             ret_and_frame_pair = [cap.read() for cap in captures]
