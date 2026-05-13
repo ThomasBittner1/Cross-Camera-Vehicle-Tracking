@@ -143,7 +143,7 @@ class CrossCameraMatcher:
 
             self._upsert_match(track_id, other_track_id, embedding_score, other_draw_crop, elapsed_time)
 
-    def update_elapsed_times(self, track_id, crossed_times_by_camera):
+    def update_camera_1_elapsed_times(self, track_id, crossed_times_by_camera):
         if track_id not in self.best_matches_1 or track_id not in crossed_times_by_camera[1]:
             return
 

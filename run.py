@@ -167,7 +167,7 @@ def run(config=None):
                         )
                     elif camera_index == 1:
                         cross_camera_matcher.update_camera_1_matches(track_id, crossed_times_by_camera)
-                        cross_camera_matcher.update_elapsed_times(track_id, crossed_times_by_camera)
+                        cross_camera_matcher.update_camera_1_elapsed_times(track_id, crossed_times_by_camera)
                     else:
                         raise ValueError(f"Unknown camera index: {camera_index}")
 
