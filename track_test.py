@@ -117,7 +117,7 @@ def run(config=None):
                     detection_pair[camera_index],
                     trackers[camera_index],
                     original_frames[camera_index],
-                    include_unconfirmed=True,
+                    include_unconfirmed=False,
                 )
                 for camera_index in range(len(detection_pair))
             ]

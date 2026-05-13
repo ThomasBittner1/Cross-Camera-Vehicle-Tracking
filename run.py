@@ -70,9 +70,10 @@ def _track_crossed_line(track, previous_centers, crossing_line):
     center = (int((x1 + x2) / 2), int((y1 + y2) / 2))
     previous_center = previous_centers.get(track_id)
     previous_centers[track_id] = center
-
+    print (f'crossing? {track_id}, {previous_center}')
     if previous_center is None:
         return False
+    print (f'passed {track_id}, {previous_center}')
 
     return geometry_utils.segments_intersect(
         previous_center,
@@ -82,18 +83,7 @@ def _track_crossed_line(track, previous_centers, crossing_line):
     )
 
 
-def _process_track(
-    camera_index,
-    track,
-    tracks,
-    original_frame,
-    current_frame_index,
-    delay_ms,
-    config,
-    reid_gallery,
-    previous_centers_pair,
-    crossed_times_pair,
-):
+def _process_track(camera_index, track, tracks, original_frame, current_frame_index, delay_ms, config, reid_gallery, previous_centers_pair, crossed_times_pair):
     track_id = int(track[4])
     x1, y1, x2, y2 = map(int, track[:4])
     label = f"ID {track_id}"
@@ -152,13 +142,16 @@ def run(config=None):
     trackers = create_tracker_pair(config.model_path)
 
     paused = False
+    step_next_frame = False
     current_frame_index = config.start_frame_index
     original_frames = [None, None]
     measured_fps = 0.0
     previous_frame_time = time.perf_counter()
 
     while True:
-        if not paused:
+        processed_frame = False
+        if not paused or step_next_frame:
+            step_next_frame = False
             ret_and_frame_pair = [cap.read() for cap in captures]
             ret_pair = [ret for ret, _ in ret_and_frame_pair]
             if not all(ret_pair):
@@ -171,7 +164,7 @@ def run(config=None):
                 for frame, mask in zip(frame_pair, masks)
             ]
 
-            tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames, include_unconfirmed=True)
+            tracks_pair = tracks_from_model(model, masked_frame_pair, trackers, original_frames, include_unconfirmed=False)
             current_frame_time = time.perf_counter()
             elapsed_seconds = current_frame_time - previous_frame_time
             previous_frame_time = current_frame_time
@@ -208,18 +201,22 @@ def run(config=None):
                     reid_gallery.refresh_camera_0_gallery()
 
                 frame_draw_data_pair[camera_index] = draw_data
+            processed_frame = True
 
         _handle_pending_clicks(pending_click_pair, isolated_track_id_pair, frame_draw_data_pair)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord("q"):
+        key = cv2.waitKeyEx(1)
+        key_code = key & 0xFF
+        if key_code == ord("q"):
             break
-        if key == ord(" "):
+        if key_code == ord(" "):
             paused = not paused
+        elif paused and key in (83, 63235, 65363, 2555904):
+            step_next_frame = True
         else:
-            visualizer.handle_key(key)
+            visualizer.handle_key(key_code)
 
-        if not paused:
+        if processed_frame:
             current_frame_index += 1
 
         visualizer.draw(

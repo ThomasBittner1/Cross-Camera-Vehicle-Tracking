@@ -53,11 +53,9 @@ def tracks_from_detections(detections, tracker, frame, include_unconfirmed=False
     if not include_unconfirmed:
         return tracks
 
-    unconfirmed_tracks = [
-        [*track.xyxy, track.id, track.conf, track.cls, track.det_ind]
-        for track in getattr(tracker, "active_tracks", [])
-        if not getattr(track, "is_activated", True)
-    ]
+    unconfirmed_tracks = [[*track.xyxy, track.id, track.conf, track.cls, track.det_ind]
+                          for track in tracker.active_tracks if not track.is_activated]
+
     if not unconfirmed_tracks:
         return tracks
 
@@ -67,7 +65,7 @@ def tracks_from_detections(detections, tracker, frame, include_unconfirmed=False
     return np.vstack([tracks, unconfirmed_tracks]).astype(np.float32)
 
 
-def tracks_from_model(model, frames, trackers, original_frames, skip_unconfirmed=True):
+def tracks_from_model(model, frames, trackers, original_frames, include_unconfirmed=True):
     if hasattr(model, "predict_many"):
         detection_pair = model.predict_many(frames)
     else:
@@ -77,7 +75,7 @@ def tracks_from_model(model, frames, trackers, original_frames, skip_unconfirmed
             detection_pair[camera_index],
             trackers[camera_index],
             original_frames[camera_index],
-            skip_unconfirmed=skip_unconfirmed,
+            include_unconfirmed=include_unconfirmed,
         )
         for camera_index in range(len(detection_pair))
     ]
