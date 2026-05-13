@@ -33,8 +33,8 @@ class AppConfig:
     )
 
     exit_lines_source: tuple[Line, Line] = (
-        ((411, 155), (106, 410)),
-        ((963, 307), (298, 953)),
+        ((411, 131), (5, 464)),
+        ((298, 953), (963, 307)),
     )
     mask_points_by_camera: tuple[Polygon, Polygon] = (
         (

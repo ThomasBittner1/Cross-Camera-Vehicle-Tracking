@@ -55,7 +55,13 @@ def _handle_pending_clicks(pending_click_by_camera, isolated_track_id_by_camera,
         pending_click_by_camera[camera_index] = None
 
 
-def _track_crossed_line(track, previous_centers, crossing_line):
+def _point_side_of_line(point, line):
+    x, y = point
+    (x1, y1), (x2, y2) = line
+    return (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1)
+
+
+def _track_crossed_line(track, previous_centers, crossing_line, directional=True):
     track_id = int(track[4])
     x1, y1, x2, y2 = map(int, track[:4])
     center = (int((x1 + x2) / 2), int((y1 + y2) / 2))
@@ -64,11 +70,18 @@ def _track_crossed_line(track, previous_centers, crossing_line):
     if previous_center is None:
         return False
 
-    return geometry_utils.segments_intersect(
+    crossed = geometry_utils.segments_intersect(
         previous_center,
         center,
         crossing_line[0],
         crossing_line[1],
+    )
+    if not crossed or not directional:
+        return crossed
+
+    return (
+        _point_side_of_line(previous_center, crossing_line) < 0
+        and _point_side_of_line(center, crossing_line) > 0
     )
 
 
@@ -80,6 +93,8 @@ def run(config=None):
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
 
     previous_centers_by_camera = [dict() for _ in config.video_paths]
+    previous_exit_centers_by_line = [dict() for _ in config.exit_lines_source]
+    exited_track_ids_by_line = [set() for _ in config.exit_lines_source]
     crossed_times_by_camera = [{}, {}]
     pending_click_by_camera = [None for _ in config.window_names]
     isolated_track_id_by_camera = [None for _ in config.window_names]
@@ -150,7 +165,7 @@ def run(config=None):
                     label = f"{track_id}"
                     is_good_crop = False
 
-                    if _track_crossed_line(track, previous_centers_by_camera[camera_index], config.cross_lines[camera_index]):
+                    if _track_crossed_line(track, previous_centers_by_camera[camera_index], config.cross_lines[camera_index], directional=False):
                         if track_id not in crossed_times_by_camera[camera_index]:
                             one_or_more_cars_just_crossed = True
                             crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
@@ -188,6 +203,17 @@ def run(config=None):
 
             # draw exit lines in camera 0
             frame_draw_data_by_camera[0]["exit_lines"] = config.exit_lines_source
+
+            # use _track_crossed_line to check if cars are running through the exit lines. And just print the id
+            for track in tracks_by_camera[0]:
+                track_id = int(track[4])
+                for exit_line_index, exit_line in enumerate(config.exit_lines_source):
+                    if track_id in exited_track_ids_by_line[exit_line_index]:
+                        continue
+
+                    if _track_crossed_line(track, previous_exit_centers_by_line[exit_line_index], exit_line, directional=True):
+                        exited_track_ids_by_line[exit_line_index].add(track_id)
+                        print(track_id)
 
             processed_frame = True
             if current_frame_index == pause_at_frame_index and not paused_at_target_frame:
