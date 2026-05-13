@@ -39,6 +39,18 @@ class CrossCameraMatcher:
         self.best_matches_query = defaultdict(list)
         self.query_camera_overlap_by_track_id = {}
 
+    def get_best_matches(self, also_show_uncrossed=False):
+        if also_show_uncrossed:
+            for track_id in self.best_matches_query.keys():
+                self.best_matches_query[track_id].sort(key=lambda x: x["embedding_score"], reverse=True)
+            return self.best_matches_query
+        else:
+            return_matches = {track_id : sorted(matches, key=lambda x:x["elapsed_time_score"], reverse=True)
+                                for track_id, matches in self.best_matches_query.items() if "elapsed_time" in matches}
+            print ('return_matches: ',return_matches)
+            return return_matches
+
+
     def store_query_camera_embeddings(self, tracks, frame):
         for track in tracks:
             x1, _, x2, y2 = map(int, track[:4])
@@ -141,24 +153,21 @@ class CrossCameraMatcher:
             if track_id in crossed_times_by_camera[1]:
                 elapsed_time = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
 
-            match_updated = False
+            match_got_updated = False
             for match_data in self.best_matches_query[track_id]:
                 if match_data["other_track_id"] == other_track_id:
                     match_data["embedding_score"] = embedding_score
                     if elapsed_time != -1.0:
                         match_data["elapsed_time"] = elapsed_time
-                    match_updated = True
+                    match_got_updated = True
+                    self._update_global_scores(match_data)
                     break
 
-            if not match_updated:
-                self.best_matches_query[track_id].append(
-                    {
-                        "embedding_score": embedding_score,
-                        "other_draw_crop": other_draw_crop,
-                        "other_track_id": other_track_id,
-                        "elapsed_time": elapsed_time,
-                    }
-                )
+            if not match_got_updated:
+                self.best_matches_query[track_id].append({"embedding_score": embedding_score,
+                                                          "other_draw_crop": other_draw_crop,
+                                                          "other_track_id": other_track_id,
+                                                          "elapsed_time": elapsed_time})
 
     def update_query_camera_elapsed_times(self, track_id, crossed_times_by_camera):
         if track_id not in self.best_matches_query or track_id not in crossed_times_by_camera[1]:
@@ -167,9 +176,16 @@ class CrossCameraMatcher:
         for match_data in self.best_matches_query[track_id]:
             if match_data["elapsed_time"] == -1.0:
                 other_track_id = match_data["other_track_id"]
-                match_data["elapsed_time"] = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
+                elapsed_time = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
+                match_data["elapsed_time"] = elapsed_time
+                match_data["elapsed_time_score"] = np.interp(elapsed_time,
+                                                             [0,     40,   50,   65,   75],
+                                                             [0.0,  0.0,  1.0,  1.0,  0.0])
 
-        self.best_matches_query[track_id].sort(key=lambda x: x["embedding_score"], reverse=True)
+
+    def _update_global_scores(self, match_data):
+        match_data["global_score"] = match_data["embedding_score"] * match_data.get("elapsed_time_score", 1.0)
+
 
     def _best_crop_for_source_camera_track(self, track_id):
         if self.good_crops_per_ids_source[track_id]:

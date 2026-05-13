@@ -203,7 +203,7 @@ def run(config=None):
         if processed_frame:
             current_frame_index += 1
 
-        visualizer.draw(original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, cross_camera_matcher.best_matches_query)
+        visualizer.draw(original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, cross_camera_matcher.get_best_matches())
 
     for cap in captures:
         cap.release()
