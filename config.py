@@ -37,7 +37,7 @@ class AppConfig:
             (1138, 361), (1278, 412), (1276, 3), (5, 3),
         ),
     )
-    not_from_other_camera_masks_camera_1: tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]] = (
+    not_from_other_camera_masks_query_camera: tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]] = (
         ((657, 948), (1083, 286), (1278, 419), (1277, 956)),
         ((2, 370), (536, 188), (888, 162), (1277, 199), (1275, 5), (2, 4)),
     )

@@ -68,7 +68,7 @@ class Visualizer:
 
         if camera_index == 1 and self.show_not_from_other_camera_area:
             overlay = draw_frame.copy()
-            for mask_points in self.config.not_from_other_camera_masks_camera_1:
+            for mask_points in self.config.not_from_other_camera_masks_query_camera:
                 cv2.fillPoly(
                     overlay,
                     [np.array(mask_points, dtype=np.int32)],
