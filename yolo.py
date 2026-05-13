@@ -89,9 +89,9 @@ class TensorRtDetectionModel:
             raise RuntimeError(f"TensorRT engine has invalid inputs/outputs: {self.model_path}")
 
     def predict(self, frame):
-        return self.predict_many([frame])[0]
+        return self.predict_batch([frame])[0]
 
-    def predict_many(self, frames):
+    def predict_batch(self, frames):
         if not frames:
             return []
 

@@ -22,7 +22,7 @@ def calculate_embedding_multiple(embedder, crops, distributed_count=16, return_m
     return vectors
 
 
-class ReidGallery:
+class CrossCameraMatcher:
     def __init__(self, embedder, not_from_other_camera_masks):
         self.embedder = embedder
         self.embedding_size = embedder.embedding_dim
@@ -39,7 +39,7 @@ class ReidGallery:
         self.best_matches_1 = defaultdict(list)
         self.camera_1_overlap_by_track_id = {}
 
-    def prepare_camera_1_tracks(self, tracks, frame):
+    def store_camera_1_embeddings(self, tracks, frame):
         for track in tracks:
             x1, _, x2, y2 = map(int, track[:4])
             track_id = int(track[4])

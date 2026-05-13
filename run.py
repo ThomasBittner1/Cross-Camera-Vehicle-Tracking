@@ -5,8 +5,8 @@ import time
 import embedding_utils
 import geometry_utils
 from config import AppConfig
-from reid_gallery import ReidGallery
-from tracking import create_trackers_by_camera, tracks_from_model
+from cross_camera_matcher import CrossCameraMatcher
+from tracking import create_trackers_by_camera, predict_and_track
 from visualization import Visualizer
 from yolo import load_detection_model
 
@@ -22,15 +22,6 @@ def _create_masks(captures, mask_points_by_camera):
         masks.append(mask)
     return masks
 
-
-def _build_draw_data(camera_index, config, current_frame_index, measured_fps):
-    return {
-        "boxes": [],
-        "others": [],
-        "line": config.cross_lines[camera_index],
-        "frame_text": f"Frame {current_frame_index}",
-        "fps_text": f"FPS {measured_fps:.1f}",
-    }
 
 
 def _register_mouse_callbacks(config, pending_click_by_camera):
@@ -81,7 +72,7 @@ def _track_crossed_line(track, previous_centers, crossing_line):
     )
 
 
-def _process_track(camera_index, track, tracks, original_frame, current_frame_index, delay_ms, config, reid_gallery, previous_centers_by_camera, crossed_times_by_camera):
+def _process_track(camera_index, track, tracks, original_frame, current_frame_index, delay_ms, config, cross_camera_matcher, previous_centers_by_camera, crossed_times_by_camera):
     track_id = int(track[4])
     x1, y1, x2, y2 = map(int, track[:4])
     label = f"ID {track_id}"
@@ -93,16 +84,16 @@ def _process_track(camera_index, track, tracks, original_frame, current_frame_in
             one_or_more_cars_just_crossed = True
             crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
             if camera_index == 0:
-                reid_gallery.record_camera_0_crossing(track_id)
+                cross_camera_matcher.record_camera_0_crossing(track_id)
 
     if track_id in crossed_times_by_camera[camera_index]:
         label = f"{label} crossed"
 
     if camera_index == 0:
-        is_good_crop = reid_gallery.record_camera_0_crop(track, tracks, original_frame)
+        is_good_crop = cross_camera_matcher.record_camera_0_crop(track, tracks, original_frame)
     elif camera_index == 1:
-        reid_gallery.update_camera_1_matches(track_id, crossed_times_by_camera)
-        reid_gallery.update_elapsed_times(track_id, crossed_times_by_camera)
+        cross_camera_matcher.update_camera_1_matches(track_id, crossed_times_by_camera)
+        cross_camera_matcher.update_elapsed_times(track_id, crossed_times_by_camera)
     else:
         raise ValueError(f"Unknown camera index: {camera_index}")
 
@@ -118,7 +109,7 @@ def _process_track(camera_index, track, tracks, original_frame, current_frame_in
 def run(config=None):
     config = config or AppConfig()
     embedder = embedding_utils.EmbeddingGenerator()
-    reid_gallery = ReidGallery(embedder, config.not_from_other_camera_masks_camera_1)
+    cross_camera_matcher = CrossCameraMatcher(embedder, config.not_from_other_camera_masks_camera_1)
     visualizer = Visualizer(config)
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
 
@@ -165,43 +156,41 @@ def run(config=None):
                 for frame, mask in zip(frame_by_camera, masks)
             ]
 
-            tracks_by_camera = tracks_from_model(model, masked_frame_by_camera, trackers, original_frames, include_unconfirmed=False)
+            tracks_by_camera = predict_and_track(model, masked_frame_by_camera, trackers, original_frames, include_unconfirmed=False)
             current_frame_time = time.perf_counter()
             elapsed_seconds = current_frame_time - previous_frame_time
             previous_frame_time = current_frame_time
             if elapsed_seconds > 0:
                 measured_fps = 1.0 / elapsed_seconds
 
-            reid_gallery.prepare_camera_1_tracks(tracks_by_camera[1], original_frames[1])
+            cross_camera_matcher.store_camera_1_embeddings(tracks_by_camera[1], original_frames[1])
 
             for camera_index in [0, 1]:
-                draw_data = _build_draw_data(camera_index, config, current_frame_index, measured_fps)
+                draw_data = {"boxes": [],
+                            "others": [],
+                            "line": config.cross_lines[camera_index],
+                            "frame_text": f"Frame {current_frame_index}",
+                            "fps_text": f"FPS {measured_fps:.1f}"}
+
                 one_or_more_cars_just_crossed = False
 
                 for track in tracks_by_camera[camera_index]:
                     track_id = int(track[4])
-                    if camera_index == 1 and not reid_gallery.camera_1_track_is_relevant(track_id):
+                    if camera_index == 1 and not cross_camera_matcher.camera_1_track_is_relevant(track_id):
                         continue
 
-                    box_draw_data, track_just_crossed = _process_track(
-                        camera_index,
-                        track,
-                        tracks_by_camera[camera_index],
-                        original_frames[camera_index],
-                        current_frame_index,
-                        delay_ms,
-                        config,
-                        reid_gallery,
-                        previous_centers_by_camera,
-                        crossed_times_by_camera,
-                    )
+                    box_draw_data, track_just_crossed = _process_track(camera_index, track,
+                                                                       tracks_by_camera[camera_index], original_frames[camera_index],
+                                                                       current_frame_index, delay_ms, config, cross_camera_matcher,
+                                                                       previous_centers_by_camera, crossed_times_by_camera)
                     one_or_more_cars_just_crossed = one_or_more_cars_just_crossed or track_just_crossed
                     draw_data["boxes"].append(box_draw_data)
 
                 if camera_index == 0 and one_or_more_cars_just_crossed:
-                    reid_gallery.refresh_camera_0_gallery()
+                    cross_camera_matcher.refresh_camera_0_gallery()
 
                 frame_draw_data_by_camera[camera_index] = draw_data
+
             processed_frame = True
             if current_frame_index == pause_at_frame_index and not paused_at_target_frame:
                 paused = True
@@ -223,12 +212,7 @@ def run(config=None):
         if processed_frame:
             current_frame_index += 1
 
-        visualizer.draw(
-            original_frames,
-            frame_draw_data_by_camera,
-            isolated_track_id_by_camera,
-            reid_gallery.best_matches_1,
-        )
+        visualizer.draw(original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, cross_camera_matcher.best_matches_1)
 
     for cap in captures:
         cap.release()

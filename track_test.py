@@ -111,8 +111,8 @@ def run(config=None):
                 cv2.bitwise_and(frame, mask)
                 for frame, mask in zip(frame_by_camera, masks)
             ]
-            if hasattr(model, "predict_many"):
-                detections_by_camera = model.predict_many(masked_frame_by_camera)
+            if hasattr(model, "predict_batch"):
+                detections_by_camera = model.predict_batch(masked_frame_by_camera)
             else:
                 detections_by_camera = [model.predict(frame) for frame in masked_frame_by_camera]
             tracks_by_camera = [

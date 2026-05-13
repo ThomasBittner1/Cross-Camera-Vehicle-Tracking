@@ -65,11 +65,8 @@ def tracks_from_detections(detections, tracker, frame, include_unconfirmed=False
     return np.vstack([tracks, unconfirmed_tracks]).astype(np.float32)
 
 
-def tracks_from_model(model, frames, trackers, original_frames, include_unconfirmed=True):
-    if hasattr(model, "predict_many"):
-        detections_by_camera = model.predict_many(frames)
-    else:
-        detections_by_camera = [model.predict(frame) for frame in frames]
+def predict_and_track(model, frames, trackers, original_frames, include_unconfirmed=True):
+    detections_by_camera = model.predict_batch(frames)
     return [
         tracks_from_detections(
             detections_by_camera[camera_index],
