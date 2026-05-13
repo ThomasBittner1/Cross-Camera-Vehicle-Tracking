@@ -70,10 +70,8 @@ def _track_crossed_line(track, previous_centers, crossing_line):
     center = (int((x1 + x2) / 2), int((y1 + y2) / 2))
     previous_center = previous_centers.get(track_id)
     previous_centers[track_id] = center
-    print (f'crossing? {track_id}, {previous_center}')
     if previous_center is None:
         return False
-    print (f'passed {track_id}, {previous_center}')
 
     return geometry_utils.segments_intersect(
         previous_center,
@@ -144,6 +142,8 @@ def run(config=None):
     paused = False
     step_next_frame = False
     current_frame_index = config.start_frame_index
+    pause_at_frame_index = 1500
+    paused_at_target_frame = False
     original_frames = [None, None]
     measured_fps = 0.0
     previous_frame_time = time.perf_counter()
@@ -203,6 +203,9 @@ def run(config=None):
 
                 frame_draw_data_pair[camera_index] = draw_data
             processed_frame = True
+            if current_frame_index == pause_at_frame_index and not paused_at_target_frame:
+                paused = True
+                paused_at_target_frame = True
 
         _handle_pending_clicks(pending_click_pair, isolated_track_id_pair, frame_draw_data_pair)
 
