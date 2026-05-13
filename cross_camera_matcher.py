@@ -110,11 +110,9 @@ class CrossCameraMatcher:
         self.histograms_of_crossed_0[track_id] = color_utils.calculate_histograms_multiple(crops)
 
     def refresh_camera_0_gallery(self):
-        self.embedding_of_crossed_0 = np.zeros(
-            (len(self.embeddings_of_crossed_per_id_0), self.embedding_size),
-            dtype="float64",
-        )
+        self.embedding_of_crossed_0 = np.zeros((len(self.embeddings_of_crossed_per_id_0), self.embedding_size), dtype="float64")
         self.embedding_of_crossed_0_map.clear()
+
         for index, other_track_id in enumerate(sorted(self.embeddings_of_crossed_per_id_0.keys())):
             self.embedding_of_crossed_0[index] = self.embeddings_of_crossed_per_id_0[other_track_id]
             self.embedding_of_crossed_0_map.append(other_track_id)

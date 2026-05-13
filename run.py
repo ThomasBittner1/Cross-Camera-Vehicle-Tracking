@@ -72,40 +72,6 @@ def _track_crossed_line(track, previous_centers, crossing_line):
     )
 
 
-def _process_track(camera_index, track, tracks, original_frame, current_frame_index, delay_ms, config, cross_camera_matcher, previous_centers_by_camera, crossed_times_by_camera):
-    track_id = int(track[4])
-    x1, y1, x2, y2 = map(int, track[:4])
-    label = f"ID {track_id}"
-    is_good_crop = False
-    one_or_more_cars_just_crossed = False
-
-    if _track_crossed_line(track, previous_centers_by_camera[camera_index], config.cross_lines[camera_index]):
-        if track_id not in crossed_times_by_camera[camera_index]:
-            one_or_more_cars_just_crossed = True
-            crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
-            if camera_index == 0:
-                cross_camera_matcher.record_camera_0_crossing(track_id)
-
-    if track_id in crossed_times_by_camera[camera_index]:
-        label = f"{label} crossed"
-
-    if camera_index == 0:
-        is_good_crop = cross_camera_matcher.record_camera_0_crop(track, tracks, original_frame)
-    elif camera_index == 1:
-        cross_camera_matcher.update_camera_1_matches(track_id, crossed_times_by_camera)
-        cross_camera_matcher.update_elapsed_times(track_id, crossed_times_by_camera)
-    else:
-        raise ValueError(f"Unknown camera index: {camera_index}")
-
-    return {
-        "track_id": track_id,
-        "coords": (x1, y1, x2, y2),
-        "label": label,
-        "label_color": [255, 255, 255] if is_good_crop else config.display.colors_by_camera[camera_index],
-        "box_color": config.display.colors_by_camera[camera_index],
-    }, one_or_more_cars_just_crossed
-
-
 def run(config=None):
     config = config or AppConfig()
     embedder = embedding_utils.EmbeddingGenerator()
@@ -179,12 +145,37 @@ def run(config=None):
                     if camera_index == 1 and not cross_camera_matcher.camera_1_track_is_relevant(track_id):
                         continue
 
-                    box_draw_data, track_just_crossed = _process_track(camera_index, track,
-                                                                       tracks_by_camera[camera_index], original_frames[camera_index],
-                                                                       current_frame_index, delay_ms, config, cross_camera_matcher,
-                                                                       previous_centers_by_camera, crossed_times_by_camera)
-                    one_or_more_cars_just_crossed = one_or_more_cars_just_crossed or track_just_crossed
-                    draw_data["boxes"].append(box_draw_data)
+                    x1, y1, x2, y2 = map(int, track[:4])
+                    label = f"ID {track_id}"
+                    is_good_crop = False
+
+                    if _track_crossed_line(track, previous_centers_by_camera[camera_index], config.cross_lines[camera_index]):
+                        if track_id not in crossed_times_by_camera[camera_index]:
+                            one_or_more_cars_just_crossed = True
+                            crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
+                            if camera_index == 0:
+                                cross_camera_matcher.record_camera_0_crossing(track_id)
+
+                    if track_id in crossed_times_by_camera[camera_index]:
+                        label = f"{label} crossed"
+
+                    if camera_index == 0:
+                        is_good_crop = cross_camera_matcher.record_camera_0_crop(
+                            track,
+                            tracks_by_camera[camera_index],
+                            original_frames[camera_index],
+                        )
+                    elif camera_index == 1:
+                        cross_camera_matcher.update_camera_1_matches(track_id, crossed_times_by_camera)
+                        cross_camera_matcher.update_elapsed_times(track_id, crossed_times_by_camera)
+                    else:
+                        raise ValueError(f"Unknown camera index: {camera_index}")
+
+                    draw_data["boxes"].append({"track_id": track_id,
+                                                "coords": (x1, y1, x2, y2),
+                                                "label": label,
+                                                "label_color": [255, 255, 255] if is_good_crop else config.display.colors_by_camera[camera_index],
+                                                "box_color": config.display.colors_by_camera[camera_index]})
 
                 if camera_index == 0 and one_or_more_cars_just_crossed:
                     cross_camera_matcher.refresh_camera_0_gallery()
