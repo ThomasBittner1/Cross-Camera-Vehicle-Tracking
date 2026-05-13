@@ -135,6 +135,7 @@ def run(config=None):
                 draw_data = {"boxes": [],
                             "others": [],
                             "line": config.cross_lines[camera_index],
+                            "exit_lines": [],
                             "frame_text": f"Frame {current_frame_index}",
                             "fps_text": f"FPS {measured_fps:.1f}"}
 
@@ -155,6 +156,9 @@ def run(config=None):
                             crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
                             if camera_index == 0:
                                 cross_camera_matcher.record_source_camera_crossing(track_id)
+
+                    # use _track_crossed_line to check if cars are running through the exit lines. And just print the id
+
 
                     if track_id in crossed_times_by_camera[camera_index]:
                         label = f"{label} crossed"
@@ -183,8 +187,7 @@ def run(config=None):
                 frame_draw_data_by_camera[camera_index] = draw_data
 
             # draw exit lines in camera 0
-
-
+            frame_draw_data_by_camera[0]["exit_lines"] = config.exit_lines_source
 
             processed_frame = True
             if current_frame_index == pause_at_frame_index and not paused_at_target_frame:
