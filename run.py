@@ -182,6 +182,10 @@ def run(config=None):
 
                 frame_draw_data_by_camera[camera_index] = draw_data
 
+            # draw exit lines in camera 0
+
+
+
             processed_frame = True
             if current_frame_index == pause_at_frame_index and not paused_at_target_frame:
                 paused = True

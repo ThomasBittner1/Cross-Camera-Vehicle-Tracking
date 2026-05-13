@@ -2,12 +2,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+Point = tuple[int, int]
+Color = tuple[int, int, int]
+Line = tuple[Point, Point]
+Polygon = tuple[Point, ...]
+
+
 @dataclass(frozen=True)
 class DisplayConfig:
-    colors_by_camera: tuple[tuple[int, int, int], tuple[int, int, int]] = ((255, 0, 0), (0, 255, 0))
-    inference_ignore_area_color: tuple[int, int, int] = (255, 0, 0)
+    colors_by_camera: tuple[Color, Color] = ((255, 0, 0), (0, 255, 0))
+    inference_ignore_area_color: Color = (255, 0, 0)
     inference_ignore_area_alpha: float = 0.5
-    not_from_other_camera_area_color: tuple[int, int, int] = (0, 0, 255)
+    not_from_other_camera_area_color: Color = (0, 0, 255)
     not_from_other_camera_area_alpha: float = 0.5
 
 
@@ -21,11 +27,16 @@ class AppConfig:
         r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
         r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
     )
-    cross_lines: tuple[tuple[tuple[int, int], tuple[int, int]], tuple[tuple[int, int], tuple[int, int]]] = (
+    cross_lines: tuple[Line, Line] = (
         ((773, 175), (953, 256)),
         ((227, 283), (731, 956)),
     )
-    mask_points_by_camera: tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]] = (
+
+    exit_lines_source: tuple[Line, Line] = (
+        ((411, 155), (106, 410)),
+        ((963, 307), (298, 953)),
+    )
+    mask_points_by_camera: tuple[Polygon, Polygon] = (
         (
             (1278, 493), (961, 256), (1101, 163), (1027, 101), (881, 126), (684, 165),
             (499, 128), (304, 142), (168, 145), (7, 222), (57, 290), (2, 352),
@@ -37,7 +48,7 @@ class AppConfig:
             (1138, 361), (1278, 412), (1276, 3), (5, 3),
         ),
     )
-    not_from_other_camera_masks_query_camera: tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]] = (
+    not_from_other_camera_masks_query_camera: tuple[Polygon, Polygon] = (
         ((657, 948), (1083, 286), (1278, 419), (1277, 956)),
         ((2, 370), (536, 188), (888, 162), (1277, 199), (1275, 5), (2, 4)),
     )
