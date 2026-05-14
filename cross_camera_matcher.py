@@ -192,7 +192,7 @@ class CrossCameraMatcher:
         if elapsed_time != -1.0:
             match_data["elapsed_time_score"] = np.interp(
                 elapsed_time,
-                [0, 40, 50, 65, 75],
+                [0, 25, 50, 65, 75],
                 [0.0, 0.0, 1.0, 1.0, 0.0],
             )
         match_data["global_score"] = match_data["embedding_score"] * match_data.get("elapsed_time_score", 1.0)
