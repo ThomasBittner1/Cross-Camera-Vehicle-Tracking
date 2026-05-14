@@ -61,18 +61,18 @@ def _point_side_of_line(point, line):
     return (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1)
 
 
-def _track_crossed_line(track, previous_centers, crossing_line, directional=False):
-    track_id = int(track[4])
+def _track_center(track):
     x1, y1, x2, y2 = map(int, track[:4])
-    center = (int((x1 + x2) / 2), int((y1 + y2) / 2))
-    previous_center = previous_centers.get(track_id)
-    previous_centers[track_id] = center
+    return (int((x1 + x2) / 2), int((y1 + y2) / 2))
+
+
+def _crossed_line(previous_center, current_center, crossing_line, directional=False):
     if previous_center is None:
         return False
 
     crossed = geometry_utils.segments_intersect(
         previous_center,
-        center,
+        current_center,
         crossing_line[0],
         crossing_line[1],
     )
@@ -81,7 +81,7 @@ def _track_crossed_line(track, previous_centers, crossing_line, directional=Fals
 
     return (
         _point_side_of_line(previous_center, crossing_line) < 0
-        and _point_side_of_line(center, crossing_line) > 0
+        and _point_side_of_line(current_center, crossing_line) > 0
     )
 
 
@@ -93,7 +93,6 @@ def run(config=None):
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
 
     previous_centers_by_camera = [dict() for _ in config.video_paths]
-    previous_exit_centers_by_line = [dict() for _ in config.disappear_lines_source]
     exited_track_ids_source = set()
     source_track_last_seen_frame = {}
     registered_source_track_ids = set()
@@ -159,15 +158,19 @@ def run(config=None):
             for track in tracks_by_camera[0]:
                 track_id = int(track[4])
                 x1, y1, x2, y2 = map(int, track[:4])
+                previous_center = previous_centers_by_camera[0].get(track_id)
+                current_center = _track_center(track)
                 is_good_crop = False
 
                 source_track_last_seen_frame[track_id] = current_frame_index
-                for exit_line_index, exit_line in enumerate(config.disappear_lines_source):
+                for exit_line in config.disappear_lines_source:
                     if track_id in exited_track_ids_source:
                         continue
 
-                    if _track_crossed_line(track, previous_exit_centers_by_line[exit_line_index], exit_line, directional=True):
+                    if _crossed_line(previous_center, current_center, exit_line, directional=True):
                         exited_track_ids_source.add(track_id)
+
+                previous_centers_by_camera[0][track_id] = current_center
 
                 min_side_length = min(abs(x2 - x1), abs(y2 - y1))
                 if min_side_length > 40:
@@ -196,11 +199,15 @@ def run(config=None):
                     continue
 
                 x1, y1, x2, y2 = map(int, track[:4])
+                previous_center = previous_centers_by_camera[1].get(track_id)
+                current_center = _track_center(track)
                 label = f"{track_id}"
 
-                if _track_crossed_line(track, previous_centers_by_camera[1], config.entry_line_query):
+                if _crossed_line(previous_center, current_center, config.entry_line_query):
                     if track_id not in crossed_times_query:
                         crossed_times_query[track_id] = current_frame_index * (delay_ms / 1000.0)
+
+                previous_centers_by_camera[1][track_id] = current_center
 
                 if track_id in crossed_times_query:
                     label = f"{label} crossed"
