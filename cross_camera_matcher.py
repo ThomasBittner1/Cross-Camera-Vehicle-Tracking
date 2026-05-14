@@ -149,8 +149,7 @@ class CrossCameraMatcher:
             for match_data in self.best_matches_query[track_id]:
                 if match_data["other_track_id"] == other_track_id:
                     match_data["embedding_score"] = embedding_score
-                    if elapsed_time != -1.0:
-                        match_data["elapsed_time"] = elapsed_time
+                    match_data["elapsed_time"] = elapsed_time
                     match_got_updated = True
                     self._recalculate_scores(match_data)
                     break
