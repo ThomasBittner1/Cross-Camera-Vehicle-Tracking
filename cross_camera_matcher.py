@@ -40,12 +40,12 @@ class CrossCameraMatcher:
     def get_best_matches(self):
         return_best_matches = {}
         for track_id, matches_by_other_track_id in self.best_matches_query.items():
-            matches_with_elapsed_time = [
+            matches_with_elapsed_ms = [
                 match for match in matches_by_other_track_id.values()
-                if "elapsed_time_score" in match
+                if "elapsed_ms_score" in match
             ]
-            if matches_with_elapsed_time:
-                return_best_matches[track_id] = sorted(matches_with_elapsed_time, key=lambda x:x["global_score"], reverse=True)
+            if matches_with_elapsed_ms:
+                return_best_matches[track_id] = sorted(matches_with_elapsed_ms, key=lambda x:x["global_score"], reverse=True)
         return return_best_matches
 
 
@@ -121,7 +121,8 @@ class CrossCameraMatcher:
             self.embedding_of_exited_source[index] = self.embeddings_per_id[other_track_id]
             self.embedding_of_exited_source_map.append(other_track_id)
 
-    def update_query_camera_matches(self, track_id, exited_times_source, crossed_times_query):
+    def update_query_camera_matches(self, track_id, crossed_time, exited_times_source):
+
         is_overlapping = self.query_camera_overlap_by_track_id.get(track_id)
         if is_overlapping or not self.embedding_histories_query[track_id]:
             return
@@ -132,8 +133,8 @@ class CrossCameraMatcher:
 
         closest_indices, embedding_scores = embedding_utils.find_closest_embeddings(
             query_embedding,
-            self.embedding_of_exited_source,
-        )
+            self.embedding_of_exited_source)
+
         if not closest_indices:
             return
 
@@ -141,9 +142,7 @@ class CrossCameraMatcher:
             other_track_id = self.embedding_of_exited_source_map[closest_index]
             other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
 
-            elapsed_time = -1.0
-            if track_id in crossed_times_query:
-                elapsed_time = crossed_times_query[track_id] - exited_times_source[other_track_id]
+            elapsed_ms = crossed_time - exited_times_source[other_track_id]
 
             match_data = self.best_matches_query[track_id].get(other_track_id)
             if match_data is None:
@@ -151,36 +150,32 @@ class CrossCameraMatcher:
                     "embedding_score": embedding_score,
                     "other_draw_crop": other_draw_crop,
                     "other_track_id": other_track_id,
-                    "elapsed_time": elapsed_time,
+                    "elapsed_ms": elapsed_ms,
                 }
                 self.best_matches_query[track_id][other_track_id] = match_data
             else:
                 match_data["embedding_score"] = embedding_score
-                match_data["elapsed_time"] = elapsed_time
+                match_data["elapsed_ms"] = elapsed_ms
 
             self._recalculate_scores(match_data)
 
-    def update_query_camera_elapsed_times(self, track_id, exited_times_source, crossed_times_query):
-        if track_id not in self.best_matches_query or track_id not in crossed_times_query:
-            return
-
         for match_data in self.best_matches_query[track_id].values():
-            if match_data["elapsed_time"] == -1.0:
+            if match_data["elapsed_ms"] == -1.0:
                 other_track_id = match_data["other_track_id"]
-                elapsed_time = crossed_times_query[track_id] - exited_times_source[other_track_id]
-                match_data["elapsed_time"] = elapsed_time
+                elapsed_ms = crossed_time - exited_times_source[other_track_id]
+                match_data["elapsed_ms"] = elapsed_ms
                 self._recalculate_scores(match_data)
 
 
     def _recalculate_scores(self, match_data):
-        elapsed_time = match_data.get("elapsed_time", -1.0)
-        if elapsed_time != -1.0:
-            match_data["elapsed_time_score"] = np.interp(
-                elapsed_time,
+        elapsed_ms = match_data.get("elapsed_ms", -1.0)
+        if elapsed_ms != -1.0:
+            match_data["elapsed_ms_score"] = np.interp(
+                elapsed_ms,
                 [0, 25, 50, 65, 75],
                 [0.0, 0.0, 1.0, 1.0, 0.0],
             )
-        match_data["global_score"] = match_data["embedding_score"] * match_data.get("elapsed_time_score", 1.0)
+        match_data["global_score"] = match_data["embedding_score"] * match_data.get("elapsed_ms_score", 1.0)
 
 
     def _best_crop_for_source_camera_track(self, track_id):

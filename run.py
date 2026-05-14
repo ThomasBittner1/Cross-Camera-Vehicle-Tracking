@@ -205,8 +205,9 @@ def run(config=None):
                 if track_id in crossed_times_query:
                     label = f"{label} crossed"
 
-                cross_camera_matcher.update_query_camera_matches(track_id, exited_times_source, crossed_times_query)
-                cross_camera_matcher.update_query_camera_elapsed_times(track_id, exited_times_source, crossed_times_query)
+                if track_id in crossed_times_query:
+                    cross_camera_matcher.update_query_camera_matches(track_id, crossed_times_query[track_id], exited_times_source)
+                # cross_camera_matcher.update_query_camera_elapsed_times(track_id, exited_times_source, crossed_times_query)
 
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
