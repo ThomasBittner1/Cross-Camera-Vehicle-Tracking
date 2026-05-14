@@ -64,7 +64,7 @@ class CrossCameraMatcher:
                 continue
 
             x1, y1, x2, y2 = map(int, track[:4])
-            is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
+            is_overlapping = False #geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
             self.query_camera_overlap_by_track_id[track_id] = is_overlapping
             if not is_overlapping:
                 non_overlapping_track_ids.append(track_id)
@@ -150,10 +150,13 @@ class CrossCameraMatcher:
                 match_data["embedding_score"] = embedding_score
                 match_data["elapsed_ms"] = elapsed_ms
 
-            match_data["elapsed_ms_score"] = np.interp(elapsed_ms,
-                                                       [0, 25, 50, 65, 75],
-                                                       [0.0, 0.0, 1.0, 1.0, 0.0])
-
+            # match_data["elapsed_ms_score"] = np.interp(elapsed_ms,
+            #                                            [0, 15, 23, 65, 75],
+            #                                            [0.0, 0.0, 1.0, 1.0, 0.0])
+            elapsed_ms_score = 0.0 if match_data['elapsed_ms'] < 15.0 or match_data['elapsed_ms'] > 60.0 else 1.0
+            match_data["elapsed_ms_score"] = elapsed_ms_score
+            if match_data["embedding_score"] < 0.35:
+                match_data["embedding_score"] = 0.0
             match_data["global_score"] = match_data["embedding_score"] * match_data["elapsed_ms_score"]
 
 
