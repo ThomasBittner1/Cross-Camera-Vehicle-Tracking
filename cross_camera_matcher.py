@@ -27,8 +27,8 @@ class CrossCameraMatcher:
         self.embedding_size = embedder.embedding_dim
         self.not_from_other_camera_masks = not_from_other_camera_masks
 
-        self.good_crops_per_ids_source = defaultdict(list)
-        self.bad_crops_per_ids_source = defaultdict(list)
+        self.strong_crops_per_ids_source = defaultdict(list)
+        self.weak_crops_per_ids_source = defaultdict(list)
         self.embeddings_per_id = {}
         self.embedding_histories_query = defaultdict(list)
         self.embedding_of_exited_source_map = []
@@ -84,14 +84,14 @@ class CrossCameraMatcher:
     def query_camera_track_is_relevant(self, track_id):
         return self.query_comes_from_source.get(track_id, True)
 
-    def append_source_camera_crop(self, track_id, crop, is_good_crop):
-        if is_good_crop:
-            self.good_crops_per_ids_source[track_id].append(crop)
+    def append_source_camera_crop(self, track_id, crop, is_strong_crop):
+        if is_strong_crop:
+            self.strong_crops_per_ids_source[track_id].append(crop)
         else:
-            self.bad_crops_per_ids_source[track_id].append(crop)
+            self.weak_crops_per_ids_source[track_id].append(crop)
 
     def record_embeddings(self, track_id):
-        crops = self.good_crops_per_ids_source[track_id] or self.bad_crops_per_ids_source[track_id]
+        crops = self.strong_crops_per_ids_source[track_id] or self.weak_crops_per_ids_source[track_id]
         embedding = calculate_embedding_multiple(self.embedder, crops)
         if embedding is None:
             return
@@ -153,9 +153,9 @@ class CrossCameraMatcher:
 
 
     def _best_crop_for_source_camera_track(self, track_id):
-        if self.good_crops_per_ids_source[track_id]:
-            self.good_crops_per_ids_source[track_id].sort(key=lambda crop: crop.shape[1])
-            return True, self.good_crops_per_ids_source[track_id][-1]
+        if self.strong_crops_per_ids_source[track_id]:
+            self.strong_crops_per_ids_source[track_id].sort(key=lambda crop: crop.shape[1])
+            return True, self.strong_crops_per_ids_source[track_id][-1]
 
-        self.bad_crops_per_ids_source[track_id].sort(key=lambda crop: crop.shape[1])
-        return False, self.bad_crops_per_ids_source[track_id][-1]
+        self.weak_crops_per_ids_source[track_id].sort(key=lambda crop: crop.shape[1])
+        return False, self.weak_crops_per_ids_source[track_id][-1]

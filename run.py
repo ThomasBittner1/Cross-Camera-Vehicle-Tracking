@@ -184,13 +184,13 @@ def run(config=None):
                                 min_iou=0.1,
                                 box_id=track_id,
                             )
-                            is_good_crop = (
+                            is_strong_crop = (
                                 not is_overlapping
                                 and (shrunk_x2 - shrunk_x1) > 90
                                 and 330 <= angle <= 350
                             )
-                            cross_camera_matcher.append_source_camera_crop(track_id, crop, is_good_crop)
-                            label = f"{label} {'good' if is_good_crop else 'bad'} ({angle:.2f} deg)"
+                            cross_camera_matcher.append_source_camera_crop(track_id, crop, is_strong_crop)
+                            label = f"{label} {'strong' if is_strong_crop else 'weak'} ({angle:.2f} deg)"
 
                         source_draw_data["boxes"].append({"track_id": track_id,
                                                           "coords": (x1, y1, x2, y2),
