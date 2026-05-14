@@ -125,7 +125,7 @@ class CrossCameraMatcher:
 
         for closest_index, embedding_score in zip(closest_indices, embedding_scores):
             other_track_id = self.embedding_of_exited_source_map[closest_index]
-            other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
+            is_strong, other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
 
             elapsed_ms = crossed_time - exited_times_source[other_track_id]
 
@@ -142,9 +142,8 @@ class CrossCameraMatcher:
                 match_data["embedding_score"] = embedding_score
                 match_data["elapsed_ms"] = elapsed_ms
 
-            # match_data["elapsed_ms_score"] = np.interp(elapsed_ms,
-            #                                            [0, 15, 23, 65, 75],
-            #                                            [0.0, 0.0, 1.0, 1.0, 0.0])
+            match_data["is_strong"] = is_strong
+
             elapsed_ms_score = 0.0 if match_data['elapsed_ms'] < 15.0 or match_data['elapsed_ms'] > 60.0 else 1.0
             match_data["elapsed_ms_score"] = elapsed_ms_score
             if match_data["embedding_score"] < 0.35:
@@ -156,7 +155,7 @@ class CrossCameraMatcher:
     def _best_crop_for_source_camera_track(self, track_id):
         if self.good_crops_per_ids_source[track_id]:
             self.good_crops_per_ids_source[track_id].sort(key=lambda crop: crop.shape[1])
-            return self.good_crops_per_ids_source[track_id][-1]
+            return True, self.good_crops_per_ids_source[track_id][-1]
 
         self.bad_crops_per_ids_source[track_id].sort(key=lambda crop: crop.shape[1])
-        return self.bad_crops_per_ids_source[track_id][-1]
+        return False, self.bad_crops_per_ids_source[track_id][-1]
