@@ -87,7 +87,6 @@ class Visualizer:
             )
 
     def _draw_match_panel(self, draw_frame, box, matches):
-        matches.sort(key=lambda x: x["embedding_score"], reverse=True)
         x1, _, x2, y2 = box["coords"]
         panel_items = []
         panel_width = 0
