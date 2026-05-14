@@ -144,6 +144,9 @@ class CrossCameraMatcher:
 
             match_data["is_strong"] = is_strong
 
+            if not is_strong:
+                match_data["embedding_score"] *= 1.1
+
             elapsed_ms_score = 0.0 if match_data['elapsed_ms'] < 15.0 or match_data['elapsed_ms'] > 60.0 else 1.0
             match_data["elapsed_ms_score"] = elapsed_ms_score
             if match_data["embedding_score"] < 0.35:
