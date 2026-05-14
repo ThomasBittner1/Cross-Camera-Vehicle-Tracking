@@ -159,7 +159,6 @@ def run(config=None):
             for track in tracks_by_camera[0]:
                 track_id = int(track[4])
                 x1, y1, x2, y2 = map(int, track[:4])
-                label = f"{track_id}"
                 is_good_crop = False
 
                 source_track_last_seen_frame[track_id] = current_frame_index
@@ -179,7 +178,7 @@ def run(config=None):
 
                 source_draw_data["boxes"].append({"track_id": track_id,
                                                   "coords": (x1, y1, x2, y2),
-                                                  "label": label,
+                                                  "label": f"{track_id}",
                                                   "label_color": [255, 255, 255] if is_good_crop else config.display.colors_by_camera[0],
                                                   "box_color": config.display.colors_by_camera[0]})
 
@@ -191,7 +190,6 @@ def run(config=None):
                                "exit_lines": [],
                                "frame_text": f"Frame {current_frame_index}",
                                "fps_text": f"FPS {measured_fps:.1f}"}
-
             for track in tracks_by_camera[1]:
                 track_id = int(track[4])
                 if not cross_camera_matcher.query_camera_track_is_relevant(track_id):
@@ -215,7 +213,6 @@ def run(config=None):
                                                  "label": label,
                                                  "label_color": config.display.colors_by_camera[1],
                                                  "box_color": config.display.colors_by_camera[1]})
-
             frame_draw_data_by_camera[1] = query_draw_data
 
             source_gallery_changed = False
