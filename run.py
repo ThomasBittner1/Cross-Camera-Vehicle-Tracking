@@ -120,12 +120,23 @@ def run(config=None):
     paused_at_target_frame = False
     original_frames = [None, None]
     measured_fps = 0.0
-    previous_frame_time = time.perf_counter()
 
     while True:
         processed_frame = False
+        profile_timings = None
 
         if not paused or step_next_frame:
+            profile_frame_start = time.perf_counter()
+            profile_timings = {
+                "frame": current_frame_index,
+                "predict": 0.0,
+                "query_embed": 0.0,
+                "source_crop": 0.0,
+                "query_match": 0.0,
+                "record_embed": 0.0,
+                "refresh_gallery": 0.0,
+                "draw": 0.0,
+            }
             step_next_frame = False
             ret_and_frame_by_camera = [cap.read() for cap in captures]
             ret_by_camera = [ret for ret, _ in ret_and_frame_by_camera]
@@ -139,14 +150,13 @@ def run(config=None):
                 for frame, mask in zip(frame_by_camera, masks)
             ]
 
+            profile_start = time.perf_counter()
             tracks_by_camera = predict_and_track(model, masked_frame_by_camera, trackers, original_frames, include_unconfirmed=False)
-            current_frame_time = time.perf_counter()
-            elapsed_seconds = current_frame_time - previous_frame_time
-            previous_frame_time = current_frame_time
-            if elapsed_seconds > 0:
-                measured_fps = 1.0 / elapsed_seconds
+            profile_timings["predict"] = (time.perf_counter() - profile_start) * 1000.0
 
-            cross_camera_matcher.store_query_camera_embeddings(tracks_by_camera[1], original_frames[1])
+            profile_start = time.perf_counter()
+            cross_camera_matcher.process_query_embeddings(tracks_by_camera[1], original_frames[1])
+            profile_timings["query_embed"] = (time.perf_counter() - profile_start) * 1000.0
             current_source_track_ids = {int(track[4]) for track in tracks_by_camera[0]}
 
             source_draw_data = {"boxes": [],
@@ -172,10 +182,12 @@ def run(config=None):
                 min_side_length = min(abs(x2 - x1), abs(y2 - y1))
                 label = f"{track_id}"
                 if min_side_length > 40:
+                    profile_start = time.perf_counter()
                     is_good_crop = cross_camera_matcher.record_source_camera_crop(
                         track,
                         tracks_by_camera[0],
                         original_frames[0])
+                    profile_timings["source_crop"] += (time.perf_counter() - profile_start) * 1000.0
                     label = f"{label} {'good' if is_good_crop else 'bad'}"
                 source_draw_data["boxes"].append({"track_id": track_id,
                                                   "coords": (x1, y1, x2, y2),
@@ -210,8 +222,10 @@ def run(config=None):
                 if track_id in crossed_times_query:
                     label = f"{label} crossed"
 
+                profile_start = time.perf_counter()
                 cross_camera_matcher.update_query_camera_matches(track_id, exited_times_source, crossed_times_query)
                 cross_camera_matcher.update_query_camera_elapsed_times(track_id, exited_times_source, crossed_times_query)
+                profile_timings["query_match"] += (time.perf_counter() - profile_start) * 1000.0
 
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
@@ -229,12 +243,17 @@ def run(config=None):
                     continue
 
                 exited_times_source[track_id] = last_seen_frame * (delay_ms / 1000.0)
+                profile_start = time.perf_counter()
                 cross_camera_matcher.record_embeddings(track_id)
+                profile_timings["record_embed"] += (time.perf_counter() - profile_start) * 1000.0
                 source_gallery_changed = True
 
             if source_gallery_changed:
+                profile_start = time.perf_counter()
                 cross_camera_matcher.refresh_source_camera_gallery()
+                profile_timings["refresh_gallery"] = (time.perf_counter() - profile_start) * 1000.0
 
+            profile_timings["total_before_draw"] = (time.perf_counter() - profile_frame_start) * 1000.0
             processed_frame = True
             if current_frame_index == pause_at_frame_index and not paused_at_target_frame:
                 paused = True
@@ -256,7 +275,25 @@ def run(config=None):
         if processed_frame:
             current_frame_index += 1
 
+        profile_start = time.perf_counter()
         visualizer.draw(original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, cross_camera_matcher.get_best_matches())
+        if processed_frame:
+            profile_timings["draw"] = (time.perf_counter() - profile_start) * 1000.0
+            profile_timings["total"] = profile_timings["total_before_draw"] + profile_timings["draw"]
+            if profile_timings["total"] > 0:
+                measured_fps = 1000.0 / profile_timings["total"]
+            print(
+                f"profile frame={profile_timings['frame']} fps={measured_fps:.1f} "
+                f"predict={profile_timings['predict']:.1f}ms "
+                f"query_embed={profile_timings['query_embed']:.1f}ms "
+                f"source_crop={profile_timings['source_crop']:.1f}ms "
+                f"query_match={profile_timings['query_match']:.1f}ms "
+                f"record_embed={profile_timings['record_embed']:.1f}ms "
+                f"refresh_gallery={profile_timings['refresh_gallery']:.1f}ms "
+                f"draw={profile_timings['draw']:.1f}ms "
+                f"total={profile_timings['total']:.1f}ms",
+                flush=True,
+            )
 
     for cap in captures:
         cap.release()

@@ -54,7 +54,7 @@ class CrossCameraMatcher:
             return return_best_matches
 
 
-    def store_query_camera_embeddings(self, tracks, frame):
+    def process_query_embeddings(self, tracks, frame):
         for track in tracks:
             x1, _, x2, y2 = map(int, track[:4])
             track_id = int(track[4])
