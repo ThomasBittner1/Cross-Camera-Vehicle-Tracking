@@ -84,19 +84,11 @@ class CrossCameraMatcher:
     def query_camera_track_is_relevant(self, track_id):
         return self.query_comes_from_source.get(track_id, True)
 
-    def record_source_camera_crop(self, track, tracks, frame):
-        track_id = int(track[4])
-        x1, y1, x2, y2 = map(int, track[:4])
-        is_overlapping = geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
-        width = x2 - x1
-        crop = geometry_utils.get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8)
-
-        if not is_overlapping and width > 90:
+    def append_source_camera_crop(self, track_id, crop, is_good_crop):
+        if is_good_crop:
             self.good_crops_per_ids_source[track_id].append(crop)
-            return True
-
-        self.bad_crops_per_ids_source[track_id].append(crop)
-        return False
+        else:
+            self.bad_crops_per_ids_source[track_id].append(crop)
 
     def record_embeddings(self, track_id):
         crops = self.good_crops_per_ids_source[track_id] or self.bad_crops_per_ids_source[track_id]

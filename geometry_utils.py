@@ -45,7 +45,7 @@ def is_box_overlapping(box, other_boxes, min_iou=0.2, box_id=None):
     return False
 
 
-def get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8):
+def get_shrunk_box(frame, x1, y1, x2, y2, scale=0.8):
     box_w = max(1, x2 - x1)
     box_h = max(1, y2 - y1)
     center_x = (x1 + x2) / 2.0
@@ -59,6 +59,11 @@ def get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8):
     shrunk_x2 = min(frame.shape[1], shrunk_x1 + shrunk_w)
     shrunk_y2 = min(frame.shape[0], shrunk_y1 + shrunk_h)
 
+    return shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2
+
+
+def get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8):
+    shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2 = get_shrunk_box(frame, x1, y1, x2, y2, scale)
     return frame[shrunk_y1:shrunk_y2, shrunk_x1:shrunk_x2]
 
 

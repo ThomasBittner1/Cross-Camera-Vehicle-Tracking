@@ -172,17 +172,24 @@ def run(config=None):
                         min_side_length = min(abs(x2 - x1), abs(y2 - y1))
                         if min_side_length > 40:
                             direction = velocity / vel_magnitude
+                            angle = geometry_utils.get_angle_degreese(direction) % 360
                             # label += f" ({angle:.1f} deg) | {vel_magnitude:.2f}"
 
-                            if angle < 330 or angle > 350:
-                                is_good_crop = False
-
-                            is_good_crop = cross_camera_matcher.record_source_camera_crop(
-                                track,
+                            shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2 = geometry_utils.get_shrunk_box(original_frames[0], x1, y1, x2, y2, scale=0.8)
+                            crop = original_frames[0][shrunk_y1:shrunk_y2, shrunk_x1:shrunk_x2]
+                            shrunk_track = (shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2, track_id)
+                            is_overlapping = geometry_utils.is_box_overlapping(
+                                shrunk_track,
                                 tracks_by_camera[0],
-                                original_frames[0])
-
-                            angle = geometry_utils.get_angle_degreese(direction) % 360
+                                min_iou=0.1,
+                                box_id=track_id,
+                            )
+                            is_good_crop = (
+                                not is_overlapping
+                                and (shrunk_x2 - shrunk_x1) > 90
+                                and 330 <= angle <= 350
+                            )
+                            cross_camera_matcher.append_source_camera_crop(track_id, crop, is_good_crop)
                             label = f"{label} {'good' if is_good_crop else 'bad'} ({angle:.2f} deg)"
 
                         source_draw_data["boxes"].append({"track_id": track_id,
