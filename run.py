@@ -160,8 +160,6 @@ def run(config=None):
                 x1, y1, x2, y2 = map(int, track[:4])
                 previous_center = previous_centers_by_camera[0].get(track_id)
                 current_center = _track_center(track)
-                is_good_crop = False
-
                 source_track_last_seen_frame[track_id] = current_frame_index
                 for exit_line in config.disappear_lines_source:
                     if track_id in exited_track_ids_source:
@@ -173,16 +171,17 @@ def run(config=None):
                 previous_centers_by_camera[0][track_id] = current_center
 
                 min_side_length = min(abs(x2 - x1), abs(y2 - y1))
+                color = config.display.colors_by_camera[0]
                 if min_side_length > 40:
                     is_good_crop = cross_camera_matcher.record_source_camera_crop(
                         track,
                         tracks_by_camera[0],
                         original_frames[0])
-
+                    color = [255, 255, 255] if is_good_crop else [0, 0, 0]
                 source_draw_data["boxes"].append({"track_id": track_id,
                                                   "coords": (x1, y1, x2, y2),
                                                   "label": f"{track_id}",
-                                                  "label_color": [255, 255, 255] if is_good_crop else config.display.colors_by_camera[0],
+                                                  "label_color": color,
                                                   "box_color": config.display.colors_by_camera[0]})
 
             frame_draw_data_by_camera[0] = source_draw_data
