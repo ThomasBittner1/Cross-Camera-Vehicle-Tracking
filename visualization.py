@@ -6,12 +6,15 @@ class Visualizer:
     def __init__(self, config):
         self.config = config
         self.num_other_matches_to_show = 5
+        self.debug_matches = False
         self.show_inference_ignore_area = False
         self.show_not_from_other_camera_area = False
 
     def handle_key(self, key):
         if ord("0") <= key <= ord("9"):
             self.num_other_matches_to_show = key - ord("0")
+        elif key in (ord("d"), ord("D")):
+            self.debug_matches = not self.debug_matches
         elif key in (ord("m"), ord("M")):
             self.show_inference_ignore_area = not self.show_inference_ignore_area
         elif key in (ord("o"), ord("O")):
@@ -87,12 +90,17 @@ class Visualizer:
             )
 
     def _draw_match_panel(self, draw_frame, box, matches):
+        matches_to_draw = self._visible_matches(matches)
+        if not matches_to_draw:
+            self._draw_no_matches_found(draw_frame, box)
+            return
+
         x1, _, x2, y2 = box["coords"]
         panel_items = []
         panel_width = 0
         panel_height = 0
 
-        for match_data in reversed(matches[0:self.num_other_matches_to_show]):
+        for match_data in reversed(matches_to_draw):
             other_draw_crop = match_data["other_draw_crop"]
             other_label = (
                 f"{match_data['other_track_id']} "
@@ -160,11 +168,39 @@ class Visualizer:
                 2,
             )
 
+    def _visible_matches(self, matches):
+        if self.debug_matches:
+            return matches[0:self.num_other_matches_to_show]
+
+        if matches and matches[0]["global_score"] > 0.0:
+            return matches[0:1]
+
+        return []
+
+    def _draw_no_matches_found(self, draw_frame, box):
+        x1, _, x2, y2 = box["coords"]
+        label = "no matches found"
+        text_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+        text_w, text_h = text_size
+        frame_h, frame_w = draw_frame.shape[:2]
+        x = min(max(0, x1), max(0, frame_w - text_w - 4))
+        y = min(max(text_h + baseline + 4, y2), frame_h - baseline - 4)
+        cv2.putText(
+            draw_frame,
+            label,
+            (x, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            self.config.display.colors_by_camera[0],
+            2,
+        )
+
     def _draw_legend(self, draw_frame, frame_text, fps_text):
         legend_lines = [
             frame_text,
             fps_text,
             (
+                f"D: debug matches ({'on' if self.debug_matches else 'off'})  "
                 f"0-9: matches ({self.num_other_matches_to_show})  "
                 f"M: inference-ignore ({'on' if self.show_inference_ignore_area else 'off'})  "
                 f"O: not-from-other-camera ({'on' if self.show_not_from_other_camera_area else 'off'})"
