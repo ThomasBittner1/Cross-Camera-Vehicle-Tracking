@@ -7,18 +7,49 @@ START_LINES = [(1278, 493), (961, 256), (1101, 163), (1027, 101), (881, 126), (6
 
 # List to store coordinates
 points = list(START_LINES)
+dragged_point_index = None
+POINT_HIT_RADIUS = 12
+
+
+def find_nearest_point_index(x, y):
+    if not points:
+        return None
+
+    distances = [
+        (index, (px - x) ** 2 + (py - y) ** 2)
+        for index, (px, py) in enumerate(points)
+    ]
+    nearest_index, nearest_distance = min(distances, key=lambda item: item[1])
+    if nearest_distance <= POINT_HIT_RADIUS ** 2:
+        return nearest_index
+
+    return None
 
 def draw_polygon(event, x, y, flags, param):
-    global points
+    global points, dragged_point_index
 
-    # Left click to add a point
     if event == cv2.EVENT_LBUTTONDOWN:
-        points.append((x, y))
-        print(f"Point added: ({x}, {y})")
+        dragged_point_index = find_nearest_point_index(x, y)
+        if dragged_point_index is not None:
+            points[dragged_point_index] = (x, y)
+            print(f"Moving point {dragged_point_index}: ({x}, {y})")
+        else:
+            points.append((x, y))
+            print(f"Point added: ({x}, {y})")
+
+    elif event == cv2.EVENT_MOUSEMOVE and dragged_point_index is not None:
+        points[dragged_point_index] = (x, y)
+
+    elif event == cv2.EVENT_LBUTTONUP:
+        if dragged_point_index is not None:
+            points[dragged_point_index] = (x, y)
+            print(f"Point moved: ({x}, {y})")
+        dragged_point_index = None
 
     # Right click to reset points if you mess up
     elif event == cv2.EVENT_RBUTTONDOWN:
         points = list(START_LINES)
+        dragged_point_index = None
         print("Resetting points to START_LINES.")
 
 
@@ -42,9 +73,10 @@ def main():
     cv2.setMouseCallback("Polygon Mask Drawer", draw_polygon)
 
     print("\n--- INSTRUCTIONS ---")
-    print("1. Left-Click to continue placing points.")
-    print("2. Right-Click to reset points to START_LINES.")
-    print("3. Press 'q' to quit and print the final array.")
+    print("1. Left-Click empty space to add points.")
+    print("2. Drag existing points to move them.")
+    print("3. Right-Click to reset points to START_LINES.")
+    print("4. Press 'q' to quit and print the final array.")
     print("---------------------\n")
 
     while True:
@@ -53,8 +85,9 @@ def main():
         # Draw lines between points
         if len(points) > 0:
             # Draw dots at each click
-            for pt in points:
-                cv2.circle(display_img, pt, 4, (0, 255, 0), -1)
+            for index, pt in enumerate(points):
+                color = (0, 0, 255) if index == dragged_point_index else (0, 255, 0)
+                cv2.circle(display_img, pt, 5, color, -1)
 
             # Draw lines connecting the dots
             if len(points) > 1:
