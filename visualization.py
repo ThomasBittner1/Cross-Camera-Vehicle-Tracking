@@ -24,7 +24,8 @@ class Visualizer:
             isolated_track_id = isolated_track_id_by_camera[camera_index]
 
             self._draw_overlays(camera_index, draw_frame)
-            cv2.line(draw_frame, draw_data["line"][0], draw_data["line"][1], (0, 0, 255), 2)
+            if draw_data["line"] is not None:
+                cv2.line(draw_frame, draw_data["line"][0], draw_data["line"][1], (0, 0, 255), 2)
             for exit_line in draw_data["exit_lines"]:
                 cv2.line(draw_frame, exit_line[0], exit_line[1], (0, 255, 255), 2)
 
