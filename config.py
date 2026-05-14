@@ -29,7 +29,7 @@ class AppConfig:
     )
     entry_line_query: Line = ((227, 283), (731, 956))
 
-    exit_lines_source: tuple[Line, Line] = (
+    disappear_lines_source: tuple[Line, Line] = (
         ((411, 131), (5, 464)),
         ((298, 953), (963, 307)),
     )

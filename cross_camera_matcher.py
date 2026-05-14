@@ -30,7 +30,7 @@ class CrossCameraMatcher:
 
         self.good_crops_per_ids_source = defaultdict(list)
         self.bad_crops_per_ids_source = defaultdict(list)
-        self.embeddings_of_crossed_per_id_source = {}
+        self.embeddings_per_id = {}
         self.histograms_of_crossed_source = {}
         self.embedding_histories_query = defaultdict(list)
         self.embedding_of_crossed_source_map = []
@@ -117,21 +117,21 @@ class CrossCameraMatcher:
         self.bad_crops_per_ids_source[track_id].append(crop)
         return False
 
-    def record_source_camera_crossing(self, track_id):
+    def record_embeddings(self, track_id):
         crops = self.good_crops_per_ids_source[track_id] or self.bad_crops_per_ids_source[track_id]
         embedding = calculate_embedding_multiple(self.embedder, crops)
         if embedding is None:
             return
 
-        self.embeddings_of_crossed_per_id_source[track_id] = embedding
+        self.embeddings_per_id[track_id] = embedding
         self.histograms_of_crossed_source[track_id] = color_utils.calculate_histograms_multiple(crops)
 
     def refresh_source_camera_gallery(self):
-        self.embedding_of_crossed_source = np.zeros((len(self.embeddings_of_crossed_per_id_source), self.embedding_size), dtype="float64")
+        self.embedding_of_crossed_source = np.zeros((len(self.embeddings_per_id), self.embedding_size), dtype="float64")
         self.embedding_of_crossed_source_map.clear()
 
-        for index, other_track_id in enumerate(sorted(self.embeddings_of_crossed_per_id_source.keys())):
-            self.embedding_of_crossed_source[index] = self.embeddings_of_crossed_per_id_source[other_track_id]
+        for index, other_track_id in enumerate(sorted(self.embeddings_per_id.keys())):
+            self.embedding_of_crossed_source[index] = self.embeddings_per_id[other_track_id]
             self.embedding_of_crossed_source_map.append(other_track_id)
 
     def update_query_camera_matches(self, track_id, crossed_times_by_camera):

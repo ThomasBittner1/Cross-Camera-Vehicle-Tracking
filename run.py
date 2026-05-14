@@ -93,7 +93,7 @@ def run(config=None):
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
 
     previous_centers_by_camera = [dict() for _ in config.video_paths]
-    previous_exit_centers_by_line = [dict() for _ in config.exit_lines_source]
+    previous_exit_centers_by_line = [dict() for _ in config.disappear_lines_source]
     exited_track_ids_source = set()
     source_track_last_seen_frame = {}
     registered_source_track_ids = set()
@@ -152,10 +152,9 @@ def run(config=None):
             source_draw_data = {"boxes": [],
                                 "others": [],
                                 "line": None,
-                                "exit_lines": config.exit_lines_source,
+                                "exit_lines": config.disappear_lines_source,
                                 "frame_text": f"Frame {current_frame_index}",
                                 "fps_text": f"FPS {measured_fps:.1f}"}
-
             for track in tracks_by_camera[0]:
                 track_id = int(track[4])
                 x1, y1, x2, y2 = map(int, track[:4])
@@ -163,7 +162,7 @@ def run(config=None):
                 is_good_crop = False
 
                 source_track_last_seen_frame[track_id] = current_frame_index
-                for exit_line_index, exit_line in enumerate(config.exit_lines_source):
+                for exit_line_index, exit_line in enumerate(config.disappear_lines_source):
                     if track_id in exited_track_ids_source:
                         continue
 
@@ -227,7 +226,7 @@ def run(config=None):
                     continue
 
                 crossed_times_by_camera[0][track_id] = last_seen_frame * (delay_ms / 1000.0)
-                cross_camera_matcher.record_source_camera_crossing(track_id)
+                cross_camera_matcher.record_embeddings(track_id)
                 source_gallery_changed = True
 
             if source_gallery_changed:
