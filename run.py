@@ -157,31 +157,30 @@ def run(config=None):
                                 "fps_text": f"FPS {measured_fps:.1f}"}
             for track in tracks_by_camera[0]:
                 track_id = int(track[4])
+                if track_id in exited_track_ids_source:
+                    continue
                 x1, y1, x2, y2 = map(int, track[:4])
                 previous_center = previous_centers_by_camera[0].get(track_id)
                 current_center = _track_center(track)
                 source_track_last_seen_frame[track_id] = current_frame_index
                 for exit_line in config.disappear_lines_source:
-                    if track_id in exited_track_ids_source:
-                        continue
-
                     if _crossed_line(previous_center, current_center, exit_line, directional=True):
                         exited_track_ids_source.add(track_id)
 
                 previous_centers_by_camera[0][track_id] = current_center
 
                 min_side_length = min(abs(x2 - x1), abs(y2 - y1))
-                color = config.display.colors_by_camera[0]
+                label = f"{track_id}"
                 if min_side_length > 40:
                     is_good_crop = cross_camera_matcher.record_source_camera_crop(
                         track,
                         tracks_by_camera[0],
                         original_frames[0])
-                    color = [255, 255, 255] if is_good_crop else [0, 0, 0]
+                    label = f"{label} {'good' if is_good_crop else 'bad'}"
                 source_draw_data["boxes"].append({"track_id": track_id,
                                                   "coords": (x1, y1, x2, y2),
-                                                  "label": f"{track_id}",
-                                                  "label_color": color,
+                                                  "label": label,
+                                                  "label_color": config.display.colors_by_camera[0],
                                                   "box_color": config.display.colors_by_camera[0]})
 
             frame_draw_data_by_camera[0] = source_draw_data
