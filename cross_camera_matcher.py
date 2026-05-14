@@ -2,7 +2,6 @@ from collections import defaultdict
 
 import numpy as np
 
-import color_utils
 import embedding_utils
 import general_utils
 import geometry_utils
@@ -31,7 +30,6 @@ class CrossCameraMatcher:
         self.good_crops_per_ids_source = defaultdict(list)
         self.bad_crops_per_ids_source = defaultdict(list)
         self.embeddings_per_id = {}
-        self.histograms_of_crossed_source = {}
         self.embedding_histories_query = defaultdict(list)
         self.embedding_of_crossed_source_map = []
         self.embedding_of_crossed_source = np.zeros(0)
@@ -124,7 +122,6 @@ class CrossCameraMatcher:
             return
 
         self.embeddings_per_id[track_id] = embedding
-        self.histograms_of_crossed_source[track_id] = color_utils.calculate_histograms_multiple(crops)
 
     def refresh_source_camera_gallery(self):
         self.embedding_of_crossed_source = np.zeros((len(self.embeddings_per_id), self.embedding_size), dtype="float64")
