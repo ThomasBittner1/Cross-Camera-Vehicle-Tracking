@@ -134,7 +134,7 @@ class CrossCameraMatcher:
             self.embedding_of_crossed_source[index] = self.embeddings_per_id[other_track_id]
             self.embedding_of_crossed_source_map.append(other_track_id)
 
-    def update_query_camera_matches(self, track_id, crossed_times_by_camera):
+    def update_query_camera_matches(self, track_id, exited_times_source, crossed_times_query):
         is_overlapping = self.query_camera_overlap_by_track_id.get(track_id)
         if is_overlapping or not self.embedding_histories_query[track_id]:
             return
@@ -155,8 +155,8 @@ class CrossCameraMatcher:
             other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
 
             elapsed_time = -1.0
-            if track_id in crossed_times_by_camera[1]:
-                elapsed_time = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
+            if track_id in crossed_times_query:
+                elapsed_time = crossed_times_query[track_id] - exited_times_source[other_track_id]
 
             match_got_updated = False
             for match_data in self.best_matches_query[track_id]:
@@ -178,14 +178,14 @@ class CrossCameraMatcher:
                 self._recalculate_scores(match_data)
                 self.best_matches_query[track_id].append(match_data)
 
-    def update_query_camera_elapsed_times(self, track_id, crossed_times_by_camera):
-        if track_id not in self.best_matches_query or track_id not in crossed_times_by_camera[1]:
+    def update_query_camera_elapsed_times(self, track_id, exited_times_source, crossed_times_query):
+        if track_id not in self.best_matches_query or track_id not in crossed_times_query:
             return
 
         for match_data in self.best_matches_query[track_id]:
             if match_data["elapsed_time"] == -1.0:
                 other_track_id = match_data["other_track_id"]
-                elapsed_time = crossed_times_by_camera[1][track_id] - crossed_times_by_camera[0][other_track_id]
+                elapsed_time = crossed_times_query[track_id] - exited_times_source[other_track_id]
                 match_data["elapsed_time"] = elapsed_time
                 self._recalculate_scores(match_data)
 

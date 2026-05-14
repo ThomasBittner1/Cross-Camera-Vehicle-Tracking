@@ -97,7 +97,8 @@ def run(config=None):
     exited_track_ids_source = set()
     source_track_last_seen_frame = {}
     registered_source_track_ids = set()
-    crossed_times_by_camera = [{}, {}]
+    exited_times_source = {}
+    crossed_times_query = {}
     pending_click_by_camera = [None for _ in config.window_names]
     isolated_track_id_by_camera = [None for _ in config.window_names]
     frame_draw_data_by_camera = [None, None]
@@ -200,14 +201,14 @@ def run(config=None):
                 label = f"{track_id}"
 
                 if _track_crossed_line(track, previous_centers_by_camera[1], config.entry_line_query):
-                    if track_id not in crossed_times_by_camera[1]:
-                        crossed_times_by_camera[1][track_id] = current_frame_index * (delay_ms / 1000.0)
+                    if track_id not in crossed_times_query:
+                        crossed_times_query[track_id] = current_frame_index * (delay_ms / 1000.0)
 
-                if track_id in crossed_times_by_camera[1]:
+                if track_id in crossed_times_query:
                     label = f"{label} crossed"
 
-                cross_camera_matcher.update_query_camera_matches(track_id, crossed_times_by_camera)
-                cross_camera_matcher.update_query_camera_elapsed_times(track_id, crossed_times_by_camera)
+                cross_camera_matcher.update_query_camera_matches(track_id, exited_times_source, crossed_times_query)
+                cross_camera_matcher.update_query_camera_elapsed_times(track_id, exited_times_source, crossed_times_query)
 
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
@@ -225,7 +226,7 @@ def run(config=None):
                 if track_id in exited_track_ids_source:
                     continue
 
-                crossed_times_by_camera[0][track_id] = last_seen_frame * (delay_ms / 1000.0)
+                exited_times_source[track_id] = last_seen_frame * (delay_ms / 1000.0)
                 cross_camera_matcher.record_embeddings(track_id)
                 source_gallery_changed = True
 
