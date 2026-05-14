@@ -26,7 +26,7 @@ class Visualizer:
             self._draw_overlays(camera_index, draw_frame)
             if draw_data["line"] is not None:
                 cv2.line(draw_frame, draw_data["line"][0], draw_data["line"][1], (0, 0, 255), 2)
-            for exit_line in draw_data["exit_lines"]:
+            for exit_line in draw_data["disappear_lines"]:
                 cv2.line(draw_frame, exit_line[0], exit_line[1], (0, 255, 255), 2)
 
             for box in draw_data["boxes"]:

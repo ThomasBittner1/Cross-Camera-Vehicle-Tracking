@@ -86,7 +86,7 @@ def run(config=None):
 
     masks = create_masks(captures, config.mask_points_by_camera)
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
-    delay_ms = 1 #max(1, int(round(1000.0 / fps)))
+    interval_ms = 1 #max(1, int(round(1000.0 / fps)))
     paused = False
     step_next_frame = False
     current_frame_index = config.start_frame_index
@@ -139,7 +139,7 @@ def run(config=None):
                 cv2.imshow(config.window_names[camera_index], draw_frame)
             processed_frame = True
 
-        key = cv2.waitKeyEx(delay_ms)
+        key = cv2.waitKeyEx(interval_ms)
         key_code = key & 0xFF
         if key_code == ord("q"):
             break

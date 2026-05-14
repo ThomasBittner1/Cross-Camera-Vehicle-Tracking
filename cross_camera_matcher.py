@@ -31,8 +31,8 @@ class CrossCameraMatcher:
         self.bad_crops_per_ids_source = defaultdict(list)
         self.embeddings_per_id = {}
         self.embedding_histories_query = defaultdict(list)
-        self.embedding_of_crossed_source_map = []
-        self.embedding_of_crossed_source = np.zeros(0)
+        self.embedding_of_exited_source_map = []
+        self.embedding_of_exited_source = np.zeros(0)
         self.comes_from_other_query_camera = {}
         self.best_matches_query = defaultdict(list)
         self.query_camera_overlap_by_track_id = {}
@@ -124,12 +124,12 @@ class CrossCameraMatcher:
         self.embeddings_per_id[track_id] = embedding
 
     def refresh_source_camera_gallery(self):
-        self.embedding_of_crossed_source = np.zeros((len(self.embeddings_per_id), self.embedding_size), dtype="float64")
-        self.embedding_of_crossed_source_map.clear()
+        self.embedding_of_exited_source = np.zeros((len(self.embeddings_per_id), self.embedding_size), dtype="float64")
+        self.embedding_of_exited_source_map.clear()
 
         for index, other_track_id in enumerate(sorted(self.embeddings_per_id.keys())):
-            self.embedding_of_crossed_source[index] = self.embeddings_per_id[other_track_id]
-            self.embedding_of_crossed_source_map.append(other_track_id)
+            self.embedding_of_exited_source[index] = self.embeddings_per_id[other_track_id]
+            self.embedding_of_exited_source_map.append(other_track_id)
 
     def update_query_camera_matches(self, track_id, exited_times_source, crossed_times_query):
         is_overlapping = self.query_camera_overlap_by_track_id.get(track_id)
@@ -137,18 +137,18 @@ class CrossCameraMatcher:
             return
 
         query_embedding = np.mean(self.embedding_histories_query[track_id], axis=0)
-        if self.embedding_of_crossed_source.size == 0 or not self.embedding_of_crossed_source_map:
+        if self.embedding_of_exited_source.size == 0 or not self.embedding_of_exited_source_map:
             return
 
         closest_indices, embedding_scores = embedding_utils.find_closest_embeddings(
             query_embedding,
-            self.embedding_of_crossed_source,
+            self.embedding_of_exited_source,
         )
         if not closest_indices:
             return
 
         for closest_index, embedding_score in zip(closest_indices, embedding_scores):
-            other_track_id = self.embedding_of_crossed_source_map[closest_index]
+            other_track_id = self.embedding_of_exited_source_map[closest_index]
             other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
 
             elapsed_time = -1.0
