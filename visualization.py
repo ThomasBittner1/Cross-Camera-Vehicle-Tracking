@@ -142,19 +142,19 @@ class Visualizer:
 
         frame_h, frame_w = draw_frame.shape[:2]
         paste_x2 = min(frame_w, x2)
-        paste_y2 = min(frame_h, y2)
         paste_x1 = max(0, paste_x2 - panel_width)
-        paste_y1 = max(0, paste_y2 - panel_height)
+        paste_y1 = max(0, y2 - panel_height)
+        paste_y2 = min(frame_h, paste_y1 + panel_height)
         visible_w = paste_x2 - paste_x1
         visible_h = paste_y2 - paste_y1
         if visible_w <= 0 or visible_h <= 0:
             return
 
-        visible_panel = panel[panel_height - visible_h:, panel_width - visible_w:]
+        hidden_x = panel_width - visible_w
+        hidden_y = 0
+        visible_panel = panel[hidden_y:hidden_y + visible_h, hidden_x:]
         draw_frame[paste_y1:paste_y2, paste_x1:paste_x2] = visible_panel
 
-        hidden_x = panel_width - visible_w
-        hidden_y = panel_height - visible_h
         for text_item in text_items:
             text_x = text_item["x"] - hidden_x
             text_y = text_item["y"] - hidden_y
