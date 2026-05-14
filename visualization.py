@@ -20,7 +20,8 @@ class Visualizer:
         elif key in (ord("o"), ord("O")):
             self.show_not_from_other_camera_area = not self.show_not_from_other_camera_area
 
-    def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, best_matches_1):
+    def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, best_matches_1,
+             cross_camera_matcher, exited_times_source):
         for camera_index in [0, 1]:
             draw_frame = original_frames[camera_index].copy()
             draw_data = frame_draw_data_by_camera[camera_index]
@@ -53,6 +54,8 @@ class Visualizer:
 
             self._draw_legend(draw_frame, draw_data["frame_text"], draw_data["fps_text"])
             cv2.imshow(self.config.window_names[camera_index], draw_frame)
+
+        self._draw_source_crops(cross_camera_matcher, exited_times_source)
 
     def _draw_overlays(self, camera_index, draw_frame):
         display = self.config.display
@@ -196,6 +199,100 @@ class Visualizer:
             self.config.display.colors_by_camera[0],
             2,
         )
+
+    def _draw_source_crops(self, cross_camera_matcher, exited_times_source):
+        source_track_ids = sorted(
+            set(cross_camera_matcher.strong_crops_per_ids_source.keys())
+            | set(cross_camera_matcher.weak_crops_per_ids_source.keys())
+        )
+        if not source_track_ids:
+            cv2.imshow("source crops", np.zeros((80, 300, 3), dtype=np.uint8))
+            return
+
+        thumb_w = 90
+        thumb_h = 60
+        header_h = 44
+        label_h = 18
+        padding = 8
+        car_gap = 14
+        col_gap = 4
+        car_w = thumb_w * 2 + col_gap
+        max_rows = max(
+            max(
+                len(cross_camera_matcher.strong_crops_per_ids_source[track_id]),
+                len(cross_camera_matcher.weak_crops_per_ids_source[track_id]),
+            )
+            for track_id in source_track_ids
+        )
+        frame_w = padding * 2 + len(source_track_ids) * car_w + (len(source_track_ids) - 1) * car_gap
+        frame_h = padding * 2 + header_h + label_h + max_rows * thumb_h
+        crops_frame = np.zeros((frame_h, frame_w, 3), dtype=np.uint8)
+
+        for car_index, track_id in enumerate(source_track_ids):
+            car_x = padding + car_index * (car_w + car_gap)
+            strong_crops = cross_camera_matcher.strong_crops_per_ids_source[track_id]
+            weak_crops = cross_camera_matcher.weak_crops_per_ids_source[track_id]
+
+            left_text = "active"
+            if track_id in exited_times_source:
+                left_text = f"left {exited_times_source[track_id]:.1f}s"
+            cv2.putText(
+                crops_frame,
+                f"id {track_id}",
+                (car_x, padding + 16),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 255),
+                1,
+            )
+            cv2.putText(
+                crops_frame,
+                left_text,
+                (car_x, padding + 34),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (0, 255, 255),
+                1,
+            )
+            cv2.putText(
+                crops_frame,
+                "strong",
+                (car_x, padding + header_h + 14),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (0, 255, 0),
+                1,
+            )
+            cv2.putText(
+                crops_frame,
+                "weak",
+                (car_x + thumb_w + col_gap, padding + header_h + 14),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (0, 180, 255),
+                1,
+            )
+
+            self._draw_crop_column(crops_frame, strong_crops, car_x, padding + header_h + label_h, thumb_w, thumb_h)
+            self._draw_crop_column(
+                crops_frame,
+                weak_crops,
+                car_x + thumb_w + col_gap,
+                padding + header_h + label_h,
+                thumb_w,
+                thumb_h,
+            )
+
+        cv2.imshow("source crops", crops_frame)
+
+    def _draw_crop_column(self, frame, crops, x, y, thumb_w, thumb_h):
+        for crop_index, crop in enumerate(crops):
+            if crop.size == 0:
+                continue
+
+            resized_crop = cv2.resize(crop, (thumb_w, thumb_h))
+            crop_y = y + crop_index * thumb_h
+            frame[crop_y:crop_y + thumb_h, x:x + thumb_w] = resized_crop
 
     def _draw_legend(self, draw_frame, frame_text, fps_text):
         legend_lines = [

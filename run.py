@@ -281,7 +281,14 @@ def run(config=None):
             last_processed_frame_time = now
             current_frame_index += 1
 
-        visualizer.draw(original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, cross_camera_matcher.get_best_matches())
+        visualizer.draw(
+            original_frames,
+            frame_draw_data_by_camera,
+            isolated_track_id_by_camera,
+            cross_camera_matcher.get_best_matches(),
+            cross_camera_matcher,
+            exited_times_source,
+        )
 
     for cap in captures:
         cap.release()
