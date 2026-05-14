@@ -94,7 +94,7 @@ def run(config=None):
 
     previous_centers_by_camera = [dict() for _ in config.video_paths]
     previous_exit_centers_by_line = [dict() for _ in config.exit_lines_source]
-    exited_track_ids_by_line = [set() for _ in config.exit_lines_source]
+    exited_track_ids_source = set()
     source_track_last_seen_frame = {}
     registered_source_track_ids = set()
     crossed_times_by_camera = [{}, {}]
@@ -152,7 +152,7 @@ def run(config=None):
             for camera_index in [0, 1]:
                 draw_data = {"boxes": [],
                             "others": [],
-                            "line": config.cross_lines[camera_index] if camera_index == 1 else None,
+                            "line": config.entry_line_query if camera_index == 1 else None,
                             "exit_lines": [],
                             "frame_text": f"Frame {current_frame_index}",
                             "fps_text": f"FPS {measured_fps:.1f}"}
@@ -166,27 +166,29 @@ def run(config=None):
                     label = f"{track_id}"
                     is_good_crop = False
 
-                    if camera_index == 1 and _track_crossed_line(track, previous_centers_by_camera[camera_index], config.cross_lines[camera_index]):
-                        if track_id not in crossed_times_by_camera[camera_index]:
-                            crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
+                    if camera_index == 1:
+                        if _track_crossed_line(track, previous_centers_by_camera[camera_index], config.entry_line_query):
+                            if track_id not in crossed_times_by_camera[camera_index]:
+                                crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
 
-                    if track_id in crossed_times_by_camera[camera_index]:
-                        label = f"{label} crossed"
+                        if track_id in crossed_times_by_camera[camera_index]:
+                            label = f"{label} crossed"
 
                     if camera_index == 0:
                         source_track_last_seen_frame[track_id] = current_frame_index
                         for exit_line_index, exit_line in enumerate(config.exit_lines_source):
-                            if track_id in exited_track_ids_by_line[exit_line_index]:
+                            if track_id in exited_track_ids_source:
                                 continue
 
                             if _track_crossed_line(track, previous_exit_centers_by_line[exit_line_index], exit_line, directional=True):
-                                exited_track_ids_by_line[exit_line_index].add(track_id)
+                                exited_track_ids_source.add(track_id)
 
-                        is_good_crop = cross_camera_matcher.record_source_camera_crop(
-                            track,
-                            tracks_by_camera[camera_index],
-                            original_frames[camera_index],
-                        )
+                        min_side_length = min(abs(x2 - x1), abs(y2 - y1))
+                        if min_side_length > 40:
+                            is_good_crop = cross_camera_matcher.record_source_camera_crop(
+                                track,
+                                tracks_by_camera[camera_index],
+                                original_frames[camera_index])
                     elif camera_index == 1:
                         cross_camera_matcher.update_query_camera_matches(track_id, crossed_times_by_camera)
                         cross_camera_matcher.update_query_camera_elapsed_times(track_id, crossed_times_by_camera)
@@ -204,16 +206,12 @@ def run(config=None):
             # draw exit lines in camera 0
             frame_draw_data_by_camera[0]["exit_lines"] = config.exit_lines_source
 
-            exited_track_ids = set().union(*exited_track_ids_by_line)
             source_gallery_changed = False
             for track_id, last_seen_frame in source_track_last_seen_frame.items():
                 if track_id in current_source_track_ids or track_id in registered_source_track_ids:
                     continue
-                if current_frame_index - last_seen_frame < 5:
-                    continue
-
                 registered_source_track_ids.add(track_id)
-                if track_id in exited_track_ids:
+                if track_id in exited_track_ids_source:
                     continue
 
                 crossed_times_by_camera[0][track_id] = last_seen_frame * (delay_ms / 1000.0)

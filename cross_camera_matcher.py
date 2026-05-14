@@ -47,8 +47,12 @@ class CrossCameraMatcher:
         else:
             return_best_matches = {}
             for track_id, matches in self.best_matches_query.items():
-                if "elapsed_time_score" in matches[0]:
-                    return_best_matches[track_id] = sorted(matches, key=lambda x:x["global_score"], reverse=True)
+                matches_with_elapsed_time = [
+                    match for match in matches
+                    if "elapsed_time_score" in match
+                ]
+                if matches_with_elapsed_time:
+                    return_best_matches[track_id] = sorted(matches_with_elapsed_time, key=lambda x:x["global_score"], reverse=True)
             return return_best_matches
 
 
