@@ -174,14 +174,15 @@ def run(config=None):
                             direction = velocity / vel_magnitude
                             # label += f" ({angle:.1f} deg) | {vel_magnitude:.2f}"
 
+                            if angle < 330 or angle > 350:
+                                is_good_crop = False
+
                             is_good_crop = cross_camera_matcher.record_source_camera_crop(
                                 track,
                                 tracks_by_camera[0],
                                 original_frames[0])
 
                             angle = geometry_utils.get_angle_degreese(direction) % 360
-                            if angle < 330 or angle > 350:
-                                is_good_crop = False
                             label = f"{label} {'good' if is_good_crop else 'bad'} ({angle:.2f} deg)"
 
                         source_draw_data["boxes"].append({"track_id": track_id,
