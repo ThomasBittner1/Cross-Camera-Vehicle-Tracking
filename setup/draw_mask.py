@@ -7,8 +7,24 @@ START_LINES = [(1278, 493), (961, 256), (1101, 163), (1027, 101), (881, 126), (6
 
 # List to store coordinates
 points = list(START_LINES)
+undo_stack = []
 dragged_point_index = None
 POINT_HIT_RADIUS = 12
+
+
+def save_undo_state():
+    undo_stack.append(list(points))
+
+
+def undo():
+    global points, dragged_point_index
+    if not undo_stack:
+        print("Nothing to undo.")
+        return
+
+    points = undo_stack.pop()
+    dragged_point_index = None
+    print("Undo.")
 
 
 def find_nearest_point_index(x, y):
@@ -30,6 +46,7 @@ def draw_polygon(event, x, y, flags, param):
 
     if event == cv2.EVENT_LBUTTONDOWN:
         dragged_point_index = find_nearest_point_index(x, y)
+        save_undo_state()
         if dragged_point_index is not None:
             points[dragged_point_index] = (x, y)
             print(f"Moving point {dragged_point_index}: ({x}, {y})")
@@ -48,6 +65,7 @@ def draw_polygon(event, x, y, flags, param):
 
     # Right click to reset points if you mess up
     elif event == cv2.EVENT_RBUTTONDOWN:
+        save_undo_state()
         points = list(START_LINES)
         dragged_point_index = None
         print("Resetting points to START_LINES.")
@@ -76,7 +94,8 @@ def main():
     print("1. Left-Click empty space to add points.")
     print("2. Drag existing points to move them.")
     print("3. Right-Click to reset points to START_LINES.")
-    print("4. Press 'q' to quit and print the final array.")
+    print("4. Ctrl+Z to undo.")
+    print("5. Press 'q' to quit and print the final array.")
     print("---------------------\n")
 
     while True:
@@ -95,9 +114,12 @@ def main():
 
         cv2.imshow("Polygon Mask Drawer", display_img)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
+        key = cv2.waitKeyEx(1)
+        key_code = key & 0xFF
+        if key_code == ord('q'):
             break
+        if key_code == 26:
+            undo()
 
     # Final Output
     print("\nFinal Polygon Coordinates:")
