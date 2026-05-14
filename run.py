@@ -149,62 +149,74 @@ def run(config=None):
             cross_camera_matcher.store_query_camera_embeddings(tracks_by_camera[1], original_frames[1])
             current_source_track_ids = {int(track[4]) for track in tracks_by_camera[0]}
 
-            for camera_index in [0, 1]:
-                draw_data = {"boxes": [],
-                            "others": [],
-                            "line": config.entry_line_query if camera_index == 1 else None,
-                            "exit_lines": [],
-                            "frame_text": f"Frame {current_frame_index}",
-                            "fps_text": f"FPS {measured_fps:.1f}"}
+            source_draw_data = {"boxes": [],
+                                "others": [],
+                                "line": None,
+                                "exit_lines": config.exit_lines_source,
+                                "frame_text": f"Frame {current_frame_index}",
+                                "fps_text": f"FPS {measured_fps:.1f}"}
 
-                for track in tracks_by_camera[camera_index]:
-                    track_id = int(track[4])
-                    if camera_index == 1 and not cross_camera_matcher.query_camera_track_is_relevant(track_id):
+            for track in tracks_by_camera[0]:
+                track_id = int(track[4])
+                x1, y1, x2, y2 = map(int, track[:4])
+                label = f"{track_id}"
+                is_good_crop = False
+
+                source_track_last_seen_frame[track_id] = current_frame_index
+                for exit_line_index, exit_line in enumerate(config.exit_lines_source):
+                    if track_id in exited_track_ids_source:
                         continue
 
-                    x1, y1, x2, y2 = map(int, track[:4])
-                    label = f"{track_id}"
-                    is_good_crop = False
+                    if _track_crossed_line(track, previous_exit_centers_by_line[exit_line_index], exit_line, directional=True):
+                        exited_track_ids_source.add(track_id)
 
-                    if camera_index == 1:
-                        if _track_crossed_line(track, previous_centers_by_camera[camera_index], config.entry_line_query):
-                            if track_id not in crossed_times_by_camera[camera_index]:
-                                crossed_times_by_camera[camera_index][track_id] = current_frame_index * (delay_ms / 1000.0)
+                min_side_length = min(abs(x2 - x1), abs(y2 - y1))
+                if min_side_length > 40:
+                    is_good_crop = cross_camera_matcher.record_source_camera_crop(
+                        track,
+                        tracks_by_camera[0],
+                        original_frames[0])
 
-                        if track_id in crossed_times_by_camera[camera_index]:
-                            label = f"{label} crossed"
+                source_draw_data["boxes"].append({"track_id": track_id,
+                                                  "coords": (x1, y1, x2, y2),
+                                                  "label": label,
+                                                  "label_color": [255, 255, 255] if is_good_crop else config.display.colors_by_camera[0],
+                                                  "box_color": config.display.colors_by_camera[0]})
 
-                    if camera_index == 0:
-                        source_track_last_seen_frame[track_id] = current_frame_index
-                        for exit_line_index, exit_line in enumerate(config.exit_lines_source):
-                            if track_id in exited_track_ids_source:
-                                continue
+            frame_draw_data_by_camera[0] = source_draw_data
 
-                            if _track_crossed_line(track, previous_exit_centers_by_line[exit_line_index], exit_line, directional=True):
-                                exited_track_ids_source.add(track_id)
+            query_draw_data = {"boxes": [],
+                               "others": [],
+                               "line": config.entry_line_query,
+                               "exit_lines": [],
+                               "frame_text": f"Frame {current_frame_index}",
+                               "fps_text": f"FPS {measured_fps:.1f}"}
 
-                        min_side_length = min(abs(x2 - x1), abs(y2 - y1))
-                        if min_side_length > 40:
-                            is_good_crop = cross_camera_matcher.record_source_camera_crop(
-                                track,
-                                tracks_by_camera[camera_index],
-                                original_frames[camera_index])
-                    elif camera_index == 1:
-                        cross_camera_matcher.update_query_camera_matches(track_id, crossed_times_by_camera)
-                        cross_camera_matcher.update_query_camera_elapsed_times(track_id, crossed_times_by_camera)
-                    else:
-                        raise ValueError(f"Unknown camera index: {camera_index}")
+            for track in tracks_by_camera[1]:
+                track_id = int(track[4])
+                if not cross_camera_matcher.query_camera_track_is_relevant(track_id):
+                    continue
 
-                    draw_data["boxes"].append({"track_id": track_id,
-                                                "coords": (x1, y1, x2, y2),
-                                                "label": label,
-                                                "label_color": [255, 255, 255] if is_good_crop else config.display.colors_by_camera[camera_index],
-                                                "box_color": config.display.colors_by_camera[camera_index]})
+                x1, y1, x2, y2 = map(int, track[:4])
+                label = f"{track_id}"
 
-                frame_draw_data_by_camera[camera_index] = draw_data
+                if _track_crossed_line(track, previous_centers_by_camera[1], config.entry_line_query):
+                    if track_id not in crossed_times_by_camera[1]:
+                        crossed_times_by_camera[1][track_id] = current_frame_index * (delay_ms / 1000.0)
 
-            # draw exit lines in camera 0
-            frame_draw_data_by_camera[0]["exit_lines"] = config.exit_lines_source
+                if track_id in crossed_times_by_camera[1]:
+                    label = f"{label} crossed"
+
+                cross_camera_matcher.update_query_camera_matches(track_id, crossed_times_by_camera)
+                cross_camera_matcher.update_query_camera_elapsed_times(track_id, crossed_times_by_camera)
+
+                query_draw_data["boxes"].append({"track_id": track_id,
+                                                 "coords": (x1, y1, x2, y2),
+                                                 "label": label,
+                                                 "label_color": config.display.colors_by_camera[1],
+                                                 "box_color": config.display.colors_by_camera[1]})
+
+            frame_draw_data_by_camera[1] = query_draw_data
 
             source_gallery_changed = False
             for track_id, last_seen_frame in source_track_last_seen_frame.items():
