@@ -164,19 +164,31 @@ def run(config=None):
 
                 previous_centers_by_camera[0][track_id] = current_center
 
-                min_side_length = min(abs(x2 - x1), abs(y2 - y1))
                 label = f"{track_id}"
-                if min_side_length > 40:
-                    is_good_crop = cross_camera_matcher.record_source_camera_crop(
-                        track,
-                        tracks_by_camera[0],
-                        original_frames[0])
-                    label = f"{label} {'good' if is_good_crop else 'bad'}"
-                source_draw_data["boxes"].append({"track_id": track_id,
-                                                  "coords": (x1, y1, x2, y2),
-                                                  "label": label,
-                                                  "label_color": config.display.colors_by_camera[0],
-                                                  "box_color": config.display.colors_by_camera[0]})
+                if previous_center is not None:
+                    velocity = np.array((current_center[0] - previous_center[0], current_center[1] - previous_center[1]), dtype='float32')
+                    vel_magnitude = np.linalg.norm(velocity)
+                    if vel_magnitude > 2.0:
+                        min_side_length = min(abs(x2 - x1), abs(y2 - y1))
+                        if min_side_length > 40:
+                            direction = velocity / vel_magnitude
+                            # label += f" ({angle:.1f} deg) | {vel_magnitude:.2f}"
+
+                            is_good_crop = cross_camera_matcher.record_source_camera_crop(
+                                track,
+                                tracks_by_camera[0],
+                                original_frames[0])
+
+                            angle = geometry_utils.get_angle_degreese(direction) % 360
+                            if angle < 330 or angle > 350:
+                                is_good_crop = False
+                            label = f"{label} {'good' if is_good_crop else 'bad'} ({angle:.2f} deg)"
+
+                        source_draw_data["boxes"].append({"track_id": track_id,
+                                                          "coords": (x1, y1, x2, y2),
+                                                          "label": label,
+                                                          "label_color": config.display.colors_by_camera[0],
+                                                          "box_color": config.display.colors_by_camera[0]})
 
             frame_draw_data_by_camera[0] = source_draw_data
 

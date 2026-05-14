@@ -1,6 +1,20 @@
 import numpy as np
 import cv2
 from collections import deque, defaultdict
+import math
+
+
+def get_angle_degrees(direction):
+    dx, dy = direction
+    return math.degrees(math.atan2(dy, dx))
+
+
+def get_angle_degreese(direction):
+    return get_angle_degrees(direction)
+
+
+def get_angle(direction):
+    return get_angle_degrees(direction)
 
 
 
