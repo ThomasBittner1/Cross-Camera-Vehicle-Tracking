@@ -33,38 +33,32 @@ class CrossCameraMatcher:
         self.embedding_histories_query = defaultdict(list)
         self.embedding_of_exited_source_map = []
         self.embedding_of_exited_source = np.zeros(0)
-        self.comes_from_other_query_camera = {}
+        self.query_comes_from_source = {}
         self.best_matches_query = defaultdict(list)
         self.query_camera_overlap_by_track_id = {}
 
-    def get_best_matches(self, also_show_uncrossed=False):
-        if also_show_uncrossed:
-            for track_id in self.best_matches_query.keys():
-                self.best_matches_query[track_id].sort(key=lambda x: x["embedding_score"], reverse=True)
-            return self.best_matches_query
-        else:
-            return_best_matches = {}
-            for track_id, matches in self.best_matches_query.items():
-                matches_with_elapsed_time = [
-                    match for match in matches
-                    if "elapsed_time_score" in match
-                ]
-                if matches_with_elapsed_time:
-                    return_best_matches[track_id] = sorted(matches_with_elapsed_time, key=lambda x:x["global_score"], reverse=True)
-            return return_best_matches
+    def get_best_matches(self):
+        return_best_matches = {}
+        for track_id, matches in self.best_matches_query.items():
+            matches_with_elapsed_time = [
+                match for match in matches
+                if "elapsed_time_score" in match
+            ]
+            if matches_with_elapsed_time:
+                return_best_matches[track_id] = sorted(matches_with_elapsed_time, key=lambda x:x["global_score"], reverse=True)
+        return return_best_matches
 
 
     def process_query_embeddings(self, tracks, frame):
         for track in tracks:
             x1, _, x2, y2 = map(int, track[:4])
             track_id = int(track[4])
-            if track_id not in self.comes_from_other_query_camera:
+            if track_id not in self.query_comes_from_source:
                 bottom_center = (int((x1 + x2) / 2), y2)
                 is_inside_excluded_area = any(
                     geometry_utils.point_inside_polygon(bottom_center, mask)
-                    for mask in self.not_from_other_camera_masks
-                )
-                self.comes_from_other_query_camera[track_id] = not is_inside_excluded_area
+                    for mask in self.not_from_other_camera_masks)
+                self.query_comes_from_source[track_id] = not is_inside_excluded_area
 
         non_overlapping_crops = []
         non_overlapping_track_ids = []
@@ -72,7 +66,7 @@ class CrossCameraMatcher:
 
         for track in tracks:
             track_id = int(track[4])
-            if not self.comes_from_other_query_camera[track_id]:
+            if not self.query_comes_from_source[track_id]:
                 self.query_camera_overlap_by_track_id[track_id] = None
                 continue
 
@@ -81,25 +75,21 @@ class CrossCameraMatcher:
             self.query_camera_overlap_by_track_id[track_id] = is_overlapping
             if not is_overlapping:
                 non_overlapping_track_ids.append(track_id)
-                non_overlapping_crops.append(
-                    geometry_utils.get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8)
-                )
+                non_overlapping_crops.append(geometry_utils.get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8))
 
-        current_embeddings = calculate_embedding_multiple(
-            self.embedder,
-            non_overlapping_crops,
-            distributed_count=None,
-            return_mean=False,
-        )
-        if current_embeddings is None:
+        all_visible_query_embeddings = calculate_embedding_multiple(self.embedder,
+                                                                    non_overlapping_crops,
+                                                                    distributed_count=None,
+                                                                    return_mean=False)
+        if all_visible_query_embeddings is None:
             return
 
-        for index, vector in enumerate(current_embeddings):
+        for index, vector in enumerate(all_visible_query_embeddings):
             track_id = non_overlapping_track_ids[index]
             self.embedding_histories_query[track_id].append(vector)
 
     def query_camera_track_is_relevant(self, track_id):
-        return self.comes_from_other_query_camera.get(track_id, True)
+        return self.query_comes_from_source.get(track_id, True)
 
     def record_source_camera_crop(self, track, tracks, frame):
         track_id = int(track[4])

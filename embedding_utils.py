@@ -33,15 +33,14 @@ def cosine_distance(query, gallery):
 
 
 def find_closest_embeddings(query, gallery, max_count=5):
-    gallery = np.asarray(gallery, dtype=np.float32)
-    if gallery.ndim == 1:
-        gallery = gallery[None, :]
+    # gallery = np.asarray(gallery, dtype=np.float32)
+    # if gallery.ndim == 1:
+    #     gallery = gallery[None, :]
     if len(gallery) == 0:
         return None, None
 
     scores = cosine_similarity(query, gallery)
-    if scores.ndim == 2:
-        scores = scores[0]
+    scores = scores[0]
 
     max_count = max(1, min(int(max_count), len(scores)))
     best_indices = np.argsort(scores)[::-1][:max_count]
