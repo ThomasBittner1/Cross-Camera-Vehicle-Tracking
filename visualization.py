@@ -28,7 +28,11 @@ class Visualizer:
 
     def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, query_best_matches,
              cross_camera_matcher, source_exit_seconds):
-        for camera_index in [0, 1]:
+        camera_count = min(len(self.config.window_names), len(original_frames), len(frame_draw_data_by_camera))
+        for camera_index in range(camera_count):
+            if original_frames[camera_index] is None or frame_draw_data_by_camera[camera_index] is None:
+                continue
+
             draw_frame = original_frames[camera_index].copy()
             draw_data = frame_draw_data_by_camera[camera_index]
             isolated_track_id = isolated_track_id_by_camera[camera_index]

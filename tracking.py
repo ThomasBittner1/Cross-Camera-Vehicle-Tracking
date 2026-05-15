@@ -5,7 +5,7 @@ import torch
 from boxmot import BotSort
 
 
-def create_trackers_by_camera(model_path, frame_rate=30):
+def create_trackers_by_camera(model_path, camera_count, frame_rate=30):
     return [
         BotSort(
             reid_weights=Path(model_path),
@@ -22,7 +22,7 @@ def create_trackers_by_camera(model_path, frame_rate=30):
             cmc_method=None, #"sof",
             frame_rate=frame_rate,
         )
-        for _ in range(2)
+        for _ in range(camera_count)
     ]
 
 

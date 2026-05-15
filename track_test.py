@@ -78,7 +78,7 @@ def draw_frame_count(frame, current_frame_index):
 def run(config=None):
     config = config or AppConfig()
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
-    trackers = create_trackers_by_camera(config.model_path)
+    trackers = create_trackers_by_camera(config.model_path, len(config.video_paths))
 
     captures = [cv2.VideoCapture(video_path) for video_path in config.video_paths]
     for cap in captures:

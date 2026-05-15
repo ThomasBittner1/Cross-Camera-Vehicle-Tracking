@@ -36,9 +36,13 @@ def _register_mouse_callbacks(config, pending_click_by_camera):
 
 
 def _handle_pending_clicks(pending_click_by_camera, isolated_track_id_by_camera, frame_draw_data_by_camera):
-    for camera_index in [0, 1]:
+    camera_count = min(len(pending_click_by_camera), len(frame_draw_data_by_camera))
+    for camera_index in range(camera_count):
         pending_click = pending_click_by_camera[camera_index]
         if pending_click is None:
+            continue
+        if frame_draw_data_by_camera[camera_index] is None:
+            pending_click_by_camera[camera_index] = None
             continue
 
         clicked_box = None
@@ -87,6 +91,11 @@ def _crossed_line(previous_center, current_center, crossing_line, directional=Fa
 
 def run(config=None):
     config = config or AppConfig()
+    source_camera_index = 0
+    query_camera_index = 1
+    camera_count = len(config.video_paths)
+    if camera_count <= query_camera_index:
+        raise ValueError("The current source/query matching algorithm requires at least two video paths.")
     embedder = embedding_utils.EmbeddingGenerator()
     cross_camera_matcher = CrossCameraMatcher(embedder, config.not_from_other_camera_masks_query_camera)
     visualizer = Visualizer(config)
@@ -100,7 +109,7 @@ def run(config=None):
     crossed_seconds_query = {}
     pending_click_by_camera = [None for _ in config.window_names]
     isolated_track_id_by_camera = [None for _ in config.window_names]
-    frame_draw_data_by_camera = [None, None]
+    frame_draw_data_by_camera = [None for _ in range(camera_count)]
 
     _register_mouse_callbacks(config, pending_click_by_camera)
 
@@ -111,14 +120,14 @@ def run(config=None):
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
     frame_interval_seconds = 1.0 / fps
     masks = _create_masks(captures, config.mask_points_by_camera)
-    trackers = create_trackers_by_camera(config.model_path)
+    trackers = create_trackers_by_camera(config.model_path, camera_count)
 
     paused = False
     step_next_frame = False
     current_frame_index = config.start_frame_index
     pause_at_frame_index = 1350
     paused_at_target_frame = False
-    original_frames = [None, None]
+    original_frames = [None for _ in range(camera_count)]
     measured_fps = 0.0
     last_processed_frame_time = None
 
@@ -141,8 +150,11 @@ def run(config=None):
 
             tracks_by_camera = predict_and_track(model, masked_frame_by_camera, trackers, original_frames, include_unconfirmed=False)
 
-            cross_camera_matcher.process_query_embeddings(tracks_by_camera[1], original_frames[1])
-            current_source_track_ids = {int(track[4]) for track in tracks_by_camera[0]}
+            cross_camera_matcher.process_query_embeddings(
+                tracks_by_camera[query_camera_index],
+                original_frames[query_camera_index],
+            )
+            current_source_track_ids = {int(track[4]) for track in tracks_by_camera[source_camera_index]}
 
             source_draw_data = {"boxes": [],
                                 "others": [],
@@ -150,12 +162,12 @@ def run(config=None):
                                 "discard_lines": config.source_discard_lines,
                                 "frame_text": f"Frame {current_frame_index}",
                                 "fps_text": f"FPS {measured_fps:.1f}"}
-            for track in tracks_by_camera[0]:
+            for track in tracks_by_camera[source_camera_index]:
                 track_id = int(track[4])
                 if track_id in discarded_source_track_ids:
                     continue
                 x1, y1, x2, y2 = map(int, track[:4])
-                previous_center = previous_centers_by_camera[0].get(track_id)
+                previous_center = previous_centers_by_camera[source_camera_index].get(track_id)
                 current_center = _track_center(track)
                 source_track_last_seen_frame[track_id] = current_frame_index
                 for discard_line in config.source_discard_lines:
@@ -165,12 +177,12 @@ def run(config=None):
                         source_track_last_seen_frame.pop(track_id, None)
                         registered_source_track_ids.discard(track_id)
                         source_exit_seconds.pop(track_id, None)
-                        previous_centers_by_camera[0].pop(track_id, None)
+                        previous_centers_by_camera[source_camera_index].pop(track_id, None)
                         break
                 if track_id in discarded_source_track_ids:
                     continue
 
-                previous_centers_by_camera[0][track_id] = current_center
+                previous_centers_by_camera[source_camera_index][track_id] = current_center
 
                 label = f"{track_id}"
                 if previous_center is not None:
@@ -183,12 +195,12 @@ def run(config=None):
                             angle = geometry_utils.get_angle_degrees(direction) % 360
                             # label += f" ({angle:.1f} deg) | {vel_magnitude:.2f}"
 
-                            shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2 = geometry_utils.get_shrunk_box(original_frames[0], x1, y1, x2, y2, scale=0.8)
-                            crop = original_frames[0][shrunk_y1:shrunk_y2, shrunk_x1:shrunk_x2]
+                            shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2 = geometry_utils.get_shrunk_box(original_frames[source_camera_index], x1, y1, x2, y2, scale=0.8)
+                            crop = original_frames[source_camera_index][shrunk_y1:shrunk_y2, shrunk_x1:shrunk_x2]
                             shrunk_track = (shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2, track_id)
                             is_overlapping = geometry_utils.is_box_overlapping(
                                 shrunk_track,
-                                tracks_by_camera[0],
+                                tracks_by_camera[source_camera_index],
                                 min_iou=0.1,
                                 box_id=track_id,
                             )
@@ -203,10 +215,10 @@ def run(config=None):
                         source_draw_data["boxes"].append({"track_id": track_id,
                                                           "coords": (x1, y1, x2, y2),
                                                           "label": label,
-                                                          "label_color": config.display.colors_by_camera[0],
-                                                          "box_color": config.display.colors_by_camera[0]})
+                                                          "label_color": config.display.colors_by_camera[source_camera_index],
+                                                          "box_color": config.display.colors_by_camera[source_camera_index]})
 
-            frame_draw_data_by_camera[0] = source_draw_data
+            frame_draw_data_by_camera[source_camera_index] = source_draw_data
 
             query_draw_data = {"boxes": [],
                                "others": [],
@@ -214,13 +226,13 @@ def run(config=None):
                                "discard_lines": [],
                                "frame_text": f"Frame {current_frame_index}",
                                "fps_text": f"FPS {measured_fps:.1f}"}
-            for track in tracks_by_camera[1]:
+            for track in tracks_by_camera[query_camera_index]:
                 track_id = int(track[4])
                 if not cross_camera_matcher.query_camera_track_is_relevant(track_id):
                     continue
 
                 x1, y1, x2, y2 = map(int, track[:4])
-                previous_center = previous_centers_by_camera[1].get(track_id)
+                previous_center = previous_centers_by_camera[query_camera_index].get(track_id)
                 current_center = _track_center(track)
                 label = f"{track_id}"
 
@@ -228,7 +240,7 @@ def run(config=None):
                     if track_id not in crossed_seconds_query:
                         crossed_seconds_query[track_id] = current_frame_index * frame_interval_seconds
 
-                previous_centers_by_camera[1][track_id] = current_center
+                previous_centers_by_camera[query_camera_index][track_id] = current_center
 
                 if track_id in crossed_seconds_query:
                     label = f"{label} crossed"
@@ -239,9 +251,9 @@ def run(config=None):
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
                                                  "label": label,
-                                                 "label_color": config.display.colors_by_camera[1],
-                                                 "box_color": config.display.colors_by_camera[1]})
-            frame_draw_data_by_camera[1] = query_draw_data
+                                                 "label_color": config.display.colors_by_camera[query_camera_index],
+                                                 "box_color": config.display.colors_by_camera[query_camera_index]})
+            frame_draw_data_by_camera[query_camera_index] = query_draw_data
 
             source_gallery_changed = False
             for track_id, last_seen_frame in source_track_last_seen_frame.items():
