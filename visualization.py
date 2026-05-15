@@ -31,6 +31,7 @@ class Visualizer:
     def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, query_best_matches,
              cross_camera_matcher, source_exit_seconds):
         camera_count = min(len(self.config.window_names), len(original_frames), len(frame_draw_data_by_camera))
+        draw_frames_by_camera = {}
         for camera_index in range(camera_count):
             if original_frames[camera_index] is None or frame_draw_data_by_camera[camera_index] is None:
                 continue
@@ -67,13 +68,55 @@ class Visualizer:
                     if matches or box.get("has_crossed_entry_line", False):
                         self._draw_match_panel(draw_frame, box, matches)
 
-            self._draw_legend(draw_frame, draw_data["frame_text"], draw_data["fps_text"])
-            cv2.imshow(self.config.window_names[camera_index], draw_frame)
+            if self.debug_mode:
+                self._draw_legend(draw_frame, draw_data["frame_text"], draw_data["fps_text"])
+            draw_frames_by_camera[camera_index] = draw_frame
+
+        if self.debug_mode:
+            for camera_index, draw_frame in draw_frames_by_camera.items():
+                cv2.imshow(self.config.window_names[camera_index], draw_frame)
+        elif 1 in draw_frames_by_camera:
+            query_frame = draw_frames_by_camera[1]
+            source_inset_height = 0
+            if 0 in draw_frames_by_camera:
+                source_inset_height = self._paste_source_inset(query_frame, draw_frames_by_camera[0])
+                self._close_source_window()
+            query_draw_data = frame_draw_data_by_camera[1]
+            self._draw_legend(
+                query_frame,
+                query_draw_data["frame_text"],
+                query_draw_data["fps_text"],
+            )
+            cv2.imshow(self.config.window_names[1], query_frame)
 
         if self.debug_mode:
             self._draw_source_crops(cross_camera_matcher, source_exit_seconds)
         else:
             self._close_source_crops_window()
+
+    def _paste_source_inset(self, query_frame, source_frame):
+        inset_scale = 0.3
+        source_h, source_w = source_frame.shape[:2]
+        inset_w = max(1, int(round(source_w * inset_scale)))
+        inset_h = max(1, int(round(source_h * inset_scale)))
+        inset = cv2.resize(source_frame, (inset_w, inset_h), interpolation=cv2.INTER_AREA)
+
+        visible_h = min(query_frame.shape[0], inset_h)
+        visible_w = min(query_frame.shape[1], inset_w)
+        query_frame[0:visible_h, 0:visible_w] = inset[0:visible_h, 0:visible_w]
+        border_color = (0, 255, 255)
+        cv2.rectangle(query_frame, (0, 0), (visible_w - 1, visible_h - 1), border_color, 2)
+        label = "source"
+        text_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        text_x = max(4, visible_w - text_size[0] - 8)
+        cv2.putText(query_frame, label, (text_x, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, border_color, 2)
+        return visible_h
+
+    def _close_source_window(self):
+        try:
+            cv2.destroyWindow(self.config.window_names[0])
+        except cv2.error:
+            pass
 
     def _draw_overlays(self, camera_index, draw_frame):
         if not self.debug_mode:
@@ -324,5 +367,7 @@ class Visualizer:
                 f"O: not-from-other-camera ({'on' if self.show_not_from_other_camera_area else 'off'})"
             )
         for line_idx, legend_line in enumerate(legend_lines):
+            text_size, _ = cv2.getTextSize(legend_line, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
+            x = max(10, draw_frame.shape[1] - text_size[0] - 10)
             y = 30 + line_idx * 28
-            cv2.putText(draw_frame, legend_line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            cv2.putText(draw_frame, legend_line, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
