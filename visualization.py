@@ -74,9 +74,9 @@ class Visualizer:
             )
             cv2.addWeighted(
                 overlay,
-                display.not_from_other_camera_area_alpha,
+                display.inference_ignore_area_alpha,
                 draw_frame,
-                1 - display.not_from_other_camera_area_alpha,
+                1 - display.inference_ignore_area_alpha,
                 0,
                 draw_frame,
             )
@@ -91,9 +91,9 @@ class Visualizer:
                 )
             cv2.addWeighted(
                 overlay,
-                display.inference_ignore_area_alpha,
+                display.not_from_other_camera_area_alpha,
                 draw_frame,
-                1 - display.inference_ignore_area_alpha,
+                1 - display.not_from_other_camera_area_alpha,
                 0,
                 draw_frame,
             )

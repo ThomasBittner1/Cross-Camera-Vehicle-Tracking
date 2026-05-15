@@ -282,4 +282,4 @@ class EmbeddingGenerator:
 
     @staticmethod
     def find_closest(query, gallery, max_count=5):
-        return find_closest_embedding(query, gallery, max_count=max_count)
+        return find_closest_embeddings(query, gallery, max_count=max_count)

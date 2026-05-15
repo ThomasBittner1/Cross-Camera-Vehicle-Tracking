@@ -28,9 +28,9 @@ def _register_mouse_callbacks(config, pending_click_by_camera):
     for camera_index, window_name in enumerate(config.window_names):
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
-        def mouse_callback(event, x, y, flags, param, frame_idx=camera_index):
+        def mouse_callback(event, x, y, flags, param, callback_camera_index=camera_index):
             if event == cv2.EVENT_LBUTTONDOWN:
-                pending_click_by_camera[frame_idx] = (x, y)
+                pending_click_by_camera[callback_camera_index] = (x, y)
 
         cv2.setMouseCallback(window_name, mouse_callback)
 
@@ -180,7 +180,7 @@ def run(config=None):
                         min_side_length = min(abs(x2 - x1), abs(y2 - y1))
                         if min_side_length > 40:
                             direction = velocity / vel_magnitude
-                            angle = geometry_utils.get_angle_degreese(direction) % 360
+                            angle = geometry_utils.get_angle_degrees(direction) % 360
                             # label += f" ({angle:.1f} deg) | {vel_magnitude:.2f}"
 
                             shrunk_x1, shrunk_y1, shrunk_x2, shrunk_y2 = geometry_utils.get_shrunk_box(original_frames[0], x1, y1, x2, y2, scale=0.8)
