@@ -125,8 +125,7 @@ def run(config=None):
     paused = False
     step_next_frame = False
     current_frame_index = config.start_frame_index
-    pause_at_frame_index = 1350
-    paused_at_target_frame = False
+    debug_paused_at_target_frame = False
     original_frames = [None for _ in range(camera_count)]
     measured_fps = 0.0
     last_processed_frame_time = None
@@ -215,8 +214,8 @@ def run(config=None):
                         source_draw_data["boxes"].append({"track_id": track_id,
                                                           "coords": (x1, y1, x2, y2),
                                                           "label": label,
-                                                          "label_color": config.display.colors_by_camera[source_camera_index],
-                                                          "box_color": config.display.colors_by_camera[source_camera_index]})
+                                                          "label_color": config.display_colors_by_camera[source_camera_index],
+                                                          "box_color": config.display_colors_by_camera[source_camera_index]})
 
             frame_draw_data_by_camera[source_camera_index] = source_draw_data
 
@@ -251,8 +250,8 @@ def run(config=None):
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
                                                  "label": label,
-                                                 "label_color": config.display.colors_by_camera[query_camera_index],
-                                                 "box_color": config.display.colors_by_camera[query_camera_index]})
+                                                 "label_color": config.display_colors_by_camera[query_camera_index],
+                                                 "box_color": config.display_colors_by_camera[query_camera_index]})
             frame_draw_data_by_camera[query_camera_index] = query_draw_data
 
             source_gallery_changed = False
@@ -273,9 +272,9 @@ def run(config=None):
                 cross_camera_matcher.refresh_source_camera_gallery()
 
             processed_frame = True
-            if current_frame_index == pause_at_frame_index and not paused_at_target_frame:
+            if config.debug_pause_at_frame_index == current_frame_index and not debug_paused_at_target_frame:
                 paused = True
-                paused_at_target_frame = True
+                debug_paused_at_target_frame = True
 
         _handle_pending_clicks(pending_click_by_camera, isolated_track_id_by_camera, frame_draw_data_by_camera)
 

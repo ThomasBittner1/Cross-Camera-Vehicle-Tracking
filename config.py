@@ -1,42 +1,25 @@
-from dataclasses import dataclass
 from pathlib import Path
 
 
-Point = tuple[int, int]
-Color = tuple[int, int, int]
-Line = tuple[Point, Point]
-Polygon = tuple[Point, ...]
-
-
-@dataclass(frozen=True)
-class DisplayConfig:
-    colors_by_camera: tuple[Color, Color] = ((255, 0, 0), (0, 255, 0))
-    inference_ignore_area_color: Color = (255, 0, 0)
-    inference_ignore_area_alpha: float = 0.5
-    not_from_other_camera_area_color: Color = (0, 0, 255)
-    not_from_other_camera_area_alpha: float = 0.5
-
-
-@dataclass(frozen=True)
 class AppConfig:
-    start_frame_index: int = 0
-    # model_path: Path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train\weights\best.pt")
-    model_path: Path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train2\weights\best.engine")
-    window_names: tuple[str, str] = ("c042", "c041")
-    video_paths: tuple[str, str] = (
+    start_frame_index = 0
+    debug_pause_at_frame_index = 1350
+    model_path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train2\weights\best.engine")
+    window_names = ("c042", "c041")
+    video_paths = (
         r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
         r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",
     )
-    entry_line_query: Line = ((227, 283), (731, 956))
+    entry_line_query = ((227, 283), (731, 956))
 
-    source_discard_lines: tuple[Line, Line] = (
+    source_discard_lines = (
         ((411, 131), (5, 464)),
         ((298, 953), (963, 307)),
     )
-    mask_points_by_camera: tuple[Polygon, Polygon] = (
+    mask_points_by_camera = (
         (
-            (984, 346), (961, 256), (1101, 163), (1027, 101), (881, 126), (684, 165), (472, 124), (328, 141), (236, 182), (285, 193), (-2, 334), (0, 2), (1277, 1), (1273, 953), (1059, 957),
-            (1218, 806), (831, 517)
+            (984, 346), (961, 256), (1101, 163), (1027, 101), (881, 126), (684, 165), (472, 124), (328, 141), (236, 182),
+            (285, 193), (-2, 334), (0, 2), (1277, 1), (1273, 953), (1059, 957), (1218, 806), (831, 517)
         ),
         (
             (1, 293), (146, 205), (105, 124), (247, 86), (424, 135), (534, 116),
@@ -44,8 +27,13 @@ class AppConfig:
             (1138, 361), (1278, 412), (1276, 3), (5, 3),
         ),
     )
-    not_from_other_camera_masks_query_camera: tuple[Polygon, Polygon] = (
+    not_from_other_camera_masks_query_camera = (
         ((657, 948), (1083, 286), (1278, 419), (1277, 956)),
         ((2, 370), (536, 188), (888, 162), (1277, 199), (1275, 5), (2, 4)),
     )
-    display: DisplayConfig = DisplayConfig()
+
+    display_colors_by_camera = ((255, 0, 0), (0, 255, 0))
+    display_inference_ignore_area_color = (255, 0, 0)
+    display_inference_ignore_area_alpha = 0.5
+    display_not_from_other_camera_area_color = (0, 0, 255)
+    display_not_from_other_camera_area_alpha = 0.5

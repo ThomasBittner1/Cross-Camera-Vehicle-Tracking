@@ -1,17 +1,10 @@
-import numpy as np
 import cv2
-from collections import deque, defaultdict
 import math
 
 
 def get_angle_degrees(direction):
     dx, dy = direction
     return math.degrees(math.atan2(dy, dx))
-
-
-def get_angle(direction):
-    return get_angle_degrees(direction)
-
 
 
 def is_box_overlapping(box, other_boxes, min_iou=0.2, box_id=None):

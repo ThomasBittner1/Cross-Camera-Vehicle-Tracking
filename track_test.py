@@ -133,7 +133,7 @@ def run(config=None):
             for camera_index, tracks in enumerate(tracks_by_camera):
                 draw_frame = original_frames[camera_index].copy()
                 draw_detections(draw_frame, detections_by_camera[camera_index])
-                draw_tracks(draw_frame, tracks, config.display.colors_by_camera[camera_index])
+                draw_tracks(draw_frame, tracks, config.display_colors_by_camera[camera_index])
                 draw_frame_count(draw_frame, current_frame_index)
                 draw_fps(draw_frame, measured_fps)
                 cv2.imshow(config.window_names[camera_index], draw_frame)

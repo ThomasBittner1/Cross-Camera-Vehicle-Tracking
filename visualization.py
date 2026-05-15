@@ -68,19 +68,18 @@ class Visualizer:
         self._draw_source_crops(cross_camera_matcher, source_exit_seconds)
 
     def _draw_overlays(self, camera_index, draw_frame):
-        display = self.config.display
         if self.show_inference_ignore_area:
             overlay = draw_frame.copy()
             cv2.fillPoly(
                 overlay,
                 [np.array(self.config.mask_points_by_camera[camera_index], dtype=np.int32)],
-                display.inference_ignore_area_color,
+                self.config.display_inference_ignore_area_color,
             )
             cv2.addWeighted(
                 overlay,
-                display.inference_ignore_area_alpha,
+                self.config.display_inference_ignore_area_alpha,
                 draw_frame,
-                1 - display.inference_ignore_area_alpha,
+                1 - self.config.display_inference_ignore_area_alpha,
                 0,
                 draw_frame,
             )
@@ -91,13 +90,13 @@ class Visualizer:
                 cv2.fillPoly(
                     overlay,
                     [np.array(mask_points, dtype=np.int32)],
-                    display.not_from_other_camera_area_color,
+                    self.config.display_not_from_other_camera_area_color,
                 )
             cv2.addWeighted(
                 overlay,
-                display.not_from_other_camera_area_alpha,
+                self.config.display_not_from_other_camera_area_alpha,
                 draw_frame,
-                1 - display.not_from_other_camera_area_alpha,
+                1 - self.config.display_not_from_other_camera_area_alpha,
                 0,
                 draw_frame,
             )
@@ -179,7 +178,7 @@ class Visualizer:
                 (paste_x1 + max(0, text_x), paste_y1 + text_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
-                self.config.display.colors_by_camera[0],
+                self.config.display_colors_by_camera[0],
                 2,
             )
 
@@ -206,7 +205,7 @@ class Visualizer:
             (x, y),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,
-            self.config.display.colors_by_camera[0],
+            self.config.display_colors_by_camera[0],
             2,
         )
 
