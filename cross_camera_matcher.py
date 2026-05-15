@@ -103,13 +103,14 @@ class CrossCameraMatcher:
     def record_embeddings(self, track_id):
         crops = self.strong_crops_per_ids_source.get(track_id, []) or self.weak_crops_per_ids_source.get(track_id, [])
         if not crops:
-            return
+            return False
 
         embedding = calculate_embedding_multiple(self.embedder, crops)
         if embedding is None:
-            return
+            return False
 
         self.embeddings_per_id[track_id] = embedding
+        return True
 
     def refresh_source_camera_gallery(self):
         self.source_gallery_embeddings = np.zeros((len(self.embeddings_per_id), self.embedding_size), dtype="float64")

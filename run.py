@@ -247,12 +247,14 @@ def run(config=None):
             for track_id, last_seen_frame in source_track_last_seen_frame.items():
                 if track_id in current_source_track_ids or track_id in registered_source_track_ids:
                     continue
-                registered_source_track_ids.add(track_id)
                 if track_id in discarded_source_track_ids:
                     continue
 
+                if not cross_camera_matcher.record_embeddings(track_id):
+                    continue
+
+                registered_source_track_ids.add(track_id)
                 source_exit_seconds[track_id] = last_seen_frame * frame_interval_seconds
-                cross_camera_matcher.record_embeddings(track_id)
                 source_gallery_changed = True
 
             if source_gallery_changed:
