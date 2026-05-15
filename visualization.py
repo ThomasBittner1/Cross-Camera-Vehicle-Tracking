@@ -236,52 +236,13 @@ class Visualizer:
             left_text = "active"
             if track_id in exited_times_source:
                 left_text = f"left {exited_times_source[track_id]:.1f}s"
-            cv2.putText(
-                crops_frame,
-                f"id {track_id}",
-                (car_x, padding + 16),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 255, 255),
-                1,
-            )
-            cv2.putText(
-                crops_frame,
-                left_text,
-                (car_x, padding + 34),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.45,
-                (0, 255, 255),
-                1,
-            )
-            cv2.putText(
-                crops_frame,
-                "strong",
-                (car_x, padding + header_h + 14),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.45,
-                (0, 255, 0),
-                1,
-            )
-            cv2.putText(
-                crops_frame,
-                "weak",
-                (car_x + thumb_w + col_gap, padding + header_h + 14),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.45,
-                (0, 180, 255),
-                1,
-            )
+            cv2.putText(crops_frame, f"id {track_id}", (car_x, padding + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            cv2.putText(crops_frame, left_text, (car_x, padding + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+            cv2.putText(crops_frame, "strong", (car_x, padding + header_h + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
+            cv2.putText(crops_frame, "weak", (car_x + thumb_w + col_gap, padding + header_h + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 180, 255), 1)
 
             self._draw_crop_column(crops_frame, strong_crops, car_x, padding + header_h + label_h, thumb_w, thumb_h)
-            self._draw_crop_column(
-                crops_frame,
-                weak_crops,
-                car_x + thumb_w + col_gap,
-                padding + header_h + label_h,
-                thumb_w,
-                thumb_h,
-            )
+            self._draw_crop_column(crops_frame, weak_crops, car_x + thumb_w + col_gap, padding + header_h + label_h, thumb_w, thumb_h)
 
         cv2.imshow("source crops", crops_frame)
 

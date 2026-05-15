@@ -85,6 +85,8 @@ class CrossCameraMatcher:
         return self.query_comes_from_source.get(track_id, True)
 
     def append_source_camera_crop(self, track_id, crop, is_strong_crop):
+        if track_id == 26:
+            print ('adding 26!!!!')
         if is_strong_crop:
             self.strong_crops_per_ids_source[track_id].append(crop)
         else:
