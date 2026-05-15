@@ -31,8 +31,8 @@ class CrossCameraMatcher:
         self.weak_crops_per_ids_source = {}
         self.embeddings_per_id = {}
         self.embedding_histories_query = defaultdict(list)
-        self.embedding_of_exited_source_map = []
-        self.embedding_of_exited_source = np.zeros(0)
+        self.source_gallery_track_ids = []
+        self.source_gallery_embeddings = np.zeros(0)
         self.query_track_is_candidate = {}
         self.best_matches_query = defaultdict(dict)
 
@@ -112,12 +112,12 @@ class CrossCameraMatcher:
         self.embeddings_per_id[track_id] = embedding
 
     def refresh_source_camera_gallery(self):
-        self.embedding_of_exited_source = np.zeros((len(self.embeddings_per_id), self.embedding_size), dtype="float64")
-        self.embedding_of_exited_source_map.clear()
+        self.source_gallery_embeddings = np.zeros((len(self.embeddings_per_id), self.embedding_size), dtype="float64")
+        self.source_gallery_track_ids.clear()
 
-        for index, other_track_id in enumerate(sorted(self.embeddings_per_id.keys())):
-            self.embedding_of_exited_source[index] = self.embeddings_per_id[other_track_id]
-            self.embedding_of_exited_source_map.append(other_track_id)
+        for index, source_track_id in enumerate(sorted(self.embeddings_per_id.keys())):
+            self.source_gallery_embeddings[index] = self.embeddings_per_id[source_track_id]
+            self.source_gallery_track_ids.append(source_track_id)
 
     def check_matches(self, track_id, crossed_seconds, exited_seconds_source):
 
@@ -125,33 +125,33 @@ class CrossCameraMatcher:
             return
 
         query_embedding = np.mean(self.embedding_histories_query[track_id], axis=0)
-        if self.embedding_of_exited_source.size == 0 or not self.embedding_of_exited_source_map:
+        if self.source_gallery_embeddings.size == 0 or not self.source_gallery_track_ids:
             return
 
         closest_indices, embedding_scores = embedding_utils.find_closest_embeddings(
             query_embedding,
-            self.embedding_of_exited_source)
+            self.source_gallery_embeddings)
 
         if not closest_indices:
             return
 
         for closest_index, embedding_score in zip(closest_indices, embedding_scores):
-            other_track_id = self.embedding_of_exited_source_map[closest_index]
-            is_strong, other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
+            source_track_id = self.source_gallery_track_ids[closest_index]
+            is_strong, source_draw_crop = self._best_crop_for_source_camera_track(source_track_id)
 
-            elapsed_seconds = crossed_seconds - exited_seconds_source[other_track_id]
+            elapsed_seconds = crossed_seconds - exited_seconds_source[source_track_id]
             if elapsed_seconds < 15.0:
                 continue
 
-            match_data = self.best_matches_query[track_id].get(other_track_id)
+            match_data = self.best_matches_query[track_id].get(source_track_id)
             if match_data is None:
                 match_data = {
                     "embedding_score": embedding_score,
-                    "other_draw_crop": other_draw_crop,
-                    "other_track_id": other_track_id,
+                    "source_draw_crop": source_draw_crop,
+                    "source_track_id": source_track_id,
                     "elapsed_seconds": elapsed_seconds,
                 }
-                self.best_matches_query[track_id][other_track_id] = match_data
+                self.best_matches_query[track_id][source_track_id] = match_data
             else:
                 match_data["embedding_score"] = embedding_score
                 match_data["elapsed_seconds"] = elapsed_seconds
