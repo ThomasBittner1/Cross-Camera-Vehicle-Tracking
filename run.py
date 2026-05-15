@@ -176,7 +176,7 @@ def run(config=None):
                 if previous_center is not None:
                     velocity = np.array((current_center[0] - previous_center[0], current_center[1] - previous_center[1]), dtype='float32')
                     vel_magnitude = np.linalg.norm(velocity)
-                    if vel_magnitude > 2.0:
+                    if vel_magnitude > 5.0:
                         min_side_length = min(abs(x2 - x1), abs(y2 - y1))
                         if min_side_length > 40:
                             direction = velocity / vel_magnitude
