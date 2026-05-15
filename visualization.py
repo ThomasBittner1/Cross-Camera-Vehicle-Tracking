@@ -219,8 +219,8 @@ class Visualizer:
         car_w = thumb_w * 2 + col_gap
         max_rows = max(
             max(
-                len(cross_camera_matcher.strong_crops_per_ids_source[track_id]),
-                len(cross_camera_matcher.weak_crops_per_ids_source[track_id]),
+                len(cross_camera_matcher.strong_crops_per_ids_source.get(track_id, [])),
+                len(cross_camera_matcher.weak_crops_per_ids_source.get(track_id, [])),
             )
             for track_id in source_track_ids
         )
@@ -230,8 +230,8 @@ class Visualizer:
 
         for car_index, track_id in enumerate(source_track_ids):
             car_x = padding + car_index * (car_w + car_gap)
-            strong_crops = cross_camera_matcher.strong_crops_per_ids_source[track_id]
-            weak_crops = cross_camera_matcher.weak_crops_per_ids_source[track_id]
+            strong_crops = cross_camera_matcher.strong_crops_per_ids_source.get(track_id, [])
+            weak_crops = cross_camera_matcher.weak_crops_per_ids_source.get(track_id, [])
 
             left_text = "active"
             if track_id in exited_times_source:
