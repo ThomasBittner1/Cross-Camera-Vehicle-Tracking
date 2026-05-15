@@ -4,7 +4,8 @@ from pathlib import Path
 class AppConfig:
     start_frame_index = 0
     debug_mode = False
-    show_score_label = False
+    show_score_label = True
+    source_record_ttl_seconds = 60.0
     debug_pause_at_frame_index = 1350
     model_path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train2\weights\best.engine")
     window_names = ("source c042", "query c041")

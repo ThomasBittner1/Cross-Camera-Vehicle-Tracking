@@ -100,6 +100,26 @@ class CrossCameraMatcher:
         if gallery_needs_refresh:
             self.refresh_source_camera_gallery()
 
+    def discard_expired_source_records(self, current_seconds, source_exit_seconds, ttl_seconds):
+        expired_source_track_ids = [
+            track_id
+            for track_id, exit_seconds in source_exit_seconds.items()
+            if current_seconds - exit_seconds > ttl_seconds
+        ]
+        if not expired_source_track_ids:
+            return []
+
+        for track_id in expired_source_track_ids:
+            source_exit_seconds.pop(track_id, None)
+            self.strong_crops_per_ids_source.pop(track_id, None)
+            self.weak_crops_per_ids_source.pop(track_id, None)
+            self.embeddings_per_id.pop(track_id, None)
+            for matches_by_source_id in self.best_matches_query.values():
+                matches_by_source_id.pop(track_id, None)
+
+        self.refresh_source_camera_gallery()
+        return expired_source_track_ids
+
     def record_embeddings(self, track_id):
         crops = self.strong_crops_per_ids_source.get(track_id, []) or self.weak_crops_per_ids_source.get(track_id, [])
         if not crops:
@@ -162,11 +182,9 @@ class CrossCameraMatcher:
             if not is_strong:
                 match_data["embedding_score"] *= 1.1
 
-            elapsed_seconds_score = 0.0 if match_data['elapsed_seconds'] < 15.0 or match_data['elapsed_seconds'] > 60.0 else 1.0
-            match_data["elapsed_seconds_score"] = elapsed_seconds_score
             if match_data["embedding_score"] < 0.35:
                 match_data["embedding_score"] = 0.0
-            match_data["global_score"] = match_data["embedding_score"] * match_data["elapsed_seconds_score"]
+            match_data["global_score"] = match_data["embedding_score"]
 
 
 

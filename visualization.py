@@ -128,8 +128,8 @@ class Visualizer:
             if self.debug_mode:
                 source_label = (
                     f"{match_data['source_track_id']} "
-                    f"score: {match_data['embedding_score']:.2f} / {match_data['elapsed_seconds_score']:.1f} "
-                    f"({match_data['elapsed_seconds']:.1f}s) / {match_data['global_score']:.2f}\n"
+                    f"score: {match_data['embedding_score']:.2f} "
+                    f"({match_data['elapsed_seconds']:.1f}s)\n"
                     f"{'strong' if match_data['is_strong'] else 'weak'}")
             elif not self.config.show_score_label:
                 source_label = ""

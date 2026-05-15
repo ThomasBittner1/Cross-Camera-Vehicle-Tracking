@@ -219,6 +219,14 @@ def run(config=None):
 
             frame_draw_data_by_camera[source_camera_index] = source_draw_data
 
+            current_frame_seconds = current_frame_index * frame_interval_seconds
+            expired_source_track_ids = cross_camera_matcher.discard_expired_source_records(
+                current_frame_seconds,
+                source_exit_seconds,
+                config.source_record_ttl_seconds,
+            )
+            registered_source_track_ids.difference_update(expired_source_track_ids)
+
             query_draw_data = {"boxes": [],
                                "others": [],
                                "line": config.entry_line_query,
