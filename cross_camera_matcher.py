@@ -90,6 +90,19 @@ class CrossCameraMatcher:
         else:
             self.weak_crops_per_ids_source[track_id].append(crop)
 
+    def discard_source_camera_track(self, track_id):
+        gallery_needs_refresh = track_id in self.embeddings_per_id
+
+        self.strong_crops_per_ids_source.pop(track_id, None)
+        self.weak_crops_per_ids_source.pop(track_id, None)
+        self.embeddings_per_id.pop(track_id, None)
+
+        # for matches_by_source_id in self.best_matches_query.values():
+        #     matches_by_source_id.pop(track_id, None)
+
+        if gallery_needs_refresh:
+            self.refresh_source_camera_gallery()
+
     def record_embeddings(self, track_id):
         crops = self.strong_crops_per_ids_source[track_id] or self.weak_crops_per_ids_source[track_id]
         embedding = calculate_embedding_multiple(self.embedder, crops)
@@ -106,7 +119,7 @@ class CrossCameraMatcher:
             self.embedding_of_exited_source[index] = self.embeddings_per_id[other_track_id]
             self.embedding_of_exited_source_map.append(other_track_id)
 
-    def update_query_camera_matches(self, track_id, crossed_time, exited_times_source):
+    def check_matches(self, track_id, crossed_time, exited_times_source):
 
         is_overlapping = self.query_camera_overlap_by_track_id.get(track_id)
         if is_overlapping or not self.embedding_histories_query[track_id]:
@@ -128,6 +141,8 @@ class CrossCameraMatcher:
             is_strong, other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
 
             elapsed_ms = crossed_time - exited_times_source[other_track_id]
+            if elapsed_ms < 15.0:
+                continue
 
             match_data = self.best_matches_query[track_id].get(other_track_id)
             if match_data is None:

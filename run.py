@@ -161,6 +161,14 @@ def run(config=None):
                 for disappear_line in config.disappear_lines_source:
                     if _crossed_line(previous_center, current_center, disappear_line, directional=True):
                         disappeared_track_ids_source.add(track_id)
+                        cross_camera_matcher.discard_source_camera_track(track_id)
+                        source_track_last_seen_frame.pop(track_id, None)
+                        registered_source_track_ids.discard(track_id)
+                        exited_times_source.pop(track_id, None)
+                        previous_centers_by_camera[0].pop(track_id, None)
+                        break
+                if track_id in disappeared_track_ids_source:
+                    continue
 
                 previous_centers_by_camera[0][track_id] = current_center
 
@@ -226,7 +234,7 @@ def run(config=None):
                     label = f"{label} crossed"
 
                 if track_id in crossed_times_query:
-                    cross_camera_matcher.update_query_camera_matches(track_id, crossed_times_query[track_id], exited_times_source)
+                    cross_camera_matcher.check_matches(track_id, crossed_times_query[track_id], exited_times_source)
 
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
