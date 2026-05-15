@@ -96,8 +96,8 @@ def run(config=None):
     disappeared_track_ids_source = set()
     source_track_last_seen_frame = {}
     registered_source_track_ids = set()
-    exited_times_source = {}
-    crossed_times_query = {}
+    exited_seconds_source = {}
+    crossed_seconds_query = {}
     pending_click_by_camera = [None for _ in config.window_names]
     isolated_track_id_by_camera = [None for _ in config.window_names]
     frame_draw_data_by_camera = [None, None]
@@ -109,7 +109,7 @@ def run(config=None):
         cap.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame_index)
 
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
-    interval_ms = max(1, int(round(1000.0 / fps)))
+    frame_interval_seconds = 1.0 / fps
     masks = _create_masks(captures, config.mask_points_by_camera)
     trackers = create_trackers_by_camera(config.model_path)
 
@@ -164,7 +164,7 @@ def run(config=None):
                         cross_camera_matcher.discard_source_camera_track(track_id)
                         source_track_last_seen_frame.pop(track_id, None)
                         registered_source_track_ids.discard(track_id)
-                        exited_times_source.pop(track_id, None)
+                        exited_seconds_source.pop(track_id, None)
                         previous_centers_by_camera[0].pop(track_id, None)
                         break
                 if track_id in disappeared_track_ids_source:
@@ -225,16 +225,16 @@ def run(config=None):
                 label = f"{track_id}"
 
                 if _crossed_line(previous_center, current_center, config.entry_line_query):
-                    if track_id not in crossed_times_query:
-                        crossed_times_query[track_id] = current_frame_index * (interval_ms / 1000.0)
+                    if track_id not in crossed_seconds_query:
+                        crossed_seconds_query[track_id] = current_frame_index * frame_interval_seconds
 
                 previous_centers_by_camera[1][track_id] = current_center
 
-                if track_id in crossed_times_query:
+                if track_id in crossed_seconds_query:
                     label = f"{label} crossed"
 
-                if track_id in crossed_times_query:
-                    cross_camera_matcher.check_matches(track_id, crossed_times_query[track_id], exited_times_source)
+                if track_id in crossed_seconds_query:
+                    cross_camera_matcher.check_matches(track_id, crossed_seconds_query[track_id], exited_seconds_source)
 
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
@@ -251,7 +251,7 @@ def run(config=None):
                 if track_id in disappeared_track_ids_source:
                     continue
 
-                exited_times_source[track_id] = last_seen_frame * (interval_ms / 1000.0)
+                exited_seconds_source[track_id] = last_seen_frame * frame_interval_seconds
                 cross_camera_matcher.record_embeddings(track_id)
                 source_gallery_changed = True
 
@@ -295,7 +295,7 @@ def run(config=None):
             isolated_track_id_by_camera,
             cross_camera_matcher.get_best_matches(),
             cross_camera_matcher,
-            exited_times_source,
+            exited_seconds_source,
         )
 
     for cap in captures:

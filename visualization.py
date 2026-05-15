@@ -9,6 +9,8 @@ class Visualizer:
         self.debug_matches = False
         self.show_inference_ignore_area = False
         self.show_not_from_other_camera_area = False
+        self.source_crops_page = 0
+        self.source_crops_cars_per_page = 6
 
     def handle_key(self, key):
         if ord("0") <= key <= ord("9"):
@@ -19,9 +21,13 @@ class Visualizer:
             self.show_inference_ignore_area = not self.show_inference_ignore_area
         elif key in (ord("o"), ord("O")):
             self.show_not_from_other_camera_area = not self.show_not_from_other_camera_area
+        elif key == ord(","):
+            self.source_crops_page = max(0, self.source_crops_page - 1)
+        elif key == ord("."):
+            self.source_crops_page += 1
 
     def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, best_matches_1,
-             cross_camera_matcher, exited_times_source):
+             cross_camera_matcher, exited_seconds_source):
         for camera_index in [0, 1]:
             draw_frame = original_frames[camera_index].copy()
             draw_data = frame_draw_data_by_camera[camera_index]
@@ -55,7 +61,7 @@ class Visualizer:
             self._draw_legend(draw_frame, draw_data["frame_text"], draw_data["fps_text"])
             cv2.imshow(self.config.window_names[camera_index], draw_frame)
 
-        self._draw_source_crops(cross_camera_matcher, exited_times_source)
+        self._draw_source_crops(cross_camera_matcher, exited_seconds_source)
 
     def _draw_overlays(self, camera_index, draw_frame):
         display = self.config.display
@@ -107,8 +113,8 @@ class Visualizer:
             other_draw_crop = match_data["other_draw_crop"]
             other_label = (
                 f"{match_data['other_track_id']} "
-                f"score: {match_data['embedding_score']:.2f} / {match_data['elapsed_ms_score']:.1f} "
-                f"({match_data['elapsed_ms']:.1f}) / {match_data['global_score']:.2f}\n"
+                f"score: {match_data['embedding_score']:.2f} / {match_data['elapsed_seconds_score']:.1f} "
+                f"({match_data['elapsed_seconds']:.1f}s) / {match_data['global_score']:.2f}\n"
                 f"{'strong' if match_data['is_strong'] else 'weak'}")
 
             crop_h, crop_w = other_draw_crop.shape[:2]
@@ -200,22 +206,29 @@ class Visualizer:
             2,
         )
 
-    def _draw_source_crops(self, cross_camera_matcher, exited_times_source):
+    def _draw_source_crops(self, cross_camera_matcher, exited_seconds_source):
         source_track_ids = sorted(
             set(cross_camera_matcher.strong_crops_per_ids_source.keys())
             | set(cross_camera_matcher.weak_crops_per_ids_source.keys()),
             reverse=True,
         )
         if not source_track_ids:
+            self.source_crops_page = 0
             cv2.imshow("source crops", np.zeros((80, 300, 3), dtype=np.uint8))
             cv2.destroyWindow("source crops")
             cv2.namedWindow("source crops", cv2.WINDOW_AUTOSIZE)
             return
 
+        max_page = (len(source_track_ids) - 1) // self.source_crops_cars_per_page
+        self.source_crops_page = min(self.source_crops_page, max_page)
+        page_start = self.source_crops_page * self.source_crops_cars_per_page
+        visible_source_track_ids = source_track_ids[page_start:page_start + self.source_crops_cars_per_page]
+
         thumb_w = 90
         thumb_h = 60
         header_h = 44
         label_h = 18
+        footer_h = 18
         padding = 8
         car_gap = 14
         col_gap = 4
@@ -225,20 +238,23 @@ class Visualizer:
                 len(cross_camera_matcher.strong_crops_per_ids_source.get(track_id, [])),
                 len(cross_camera_matcher.weak_crops_per_ids_source.get(track_id, [])),
             )
-            for track_id in source_track_ids
+            for track_id in visible_source_track_ids
         )
-        frame_w = padding * 2 + len(source_track_ids) * car_w + (len(source_track_ids) - 1) * car_gap
-        frame_h = padding * 2 + header_h + label_h + max_rows * thumb_h
+        frame_w = padding * 2 + len(visible_source_track_ids) * car_w + (len(visible_source_track_ids) - 1) * car_gap
+        frame_h = padding * 2 + header_h + label_h + max_rows * thumb_h + footer_h
         crops_frame = np.zeros((frame_h, frame_w, 3), dtype=np.uint8)
 
-        for car_index, track_id in enumerate(source_track_ids):
+        page_text = f"page {self.source_crops_page + 1}/{max_page + 1}"
+        cv2.putText(crops_frame, page_text, (padding, frame_h - padding), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1)
+
+        for car_index, track_id in enumerate(visible_source_track_ids):
             car_x = padding + car_index * (car_w + car_gap)
             strong_crops = cross_camera_matcher.strong_crops_per_ids_source.get(track_id, [])
             weak_crops = cross_camera_matcher.weak_crops_per_ids_source.get(track_id, [])
 
             left_text = "active"
-            if track_id in exited_times_source:
-                left_text = f"left {exited_times_source[track_id]:.1f}s"
+            if track_id in exited_seconds_source:
+                left_text = f"left {exited_seconds_source[track_id]:.1f}s"
             cv2.putText(crops_frame, f"id {track_id}", (car_x, padding + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             cv2.putText(crops_frame, left_text, (car_x, padding + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
             cv2.putText(crops_frame, "strong", (car_x, padding + header_h + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)

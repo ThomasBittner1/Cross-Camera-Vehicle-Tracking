@@ -35,7 +35,6 @@ class CrossCameraMatcher:
         self.embedding_of_exited_source = np.zeros(0)
         self.query_comes_from_source = {}
         self.best_matches_query = defaultdict(dict)
-        self.query_camera_overlap_by_track_id = {}
 
     def get_best_matches(self):
         return {track_id: sorted(matches_by_source_id.values(), key=lambda match: match["global_score"], reverse=True)
@@ -53,32 +52,27 @@ class CrossCameraMatcher:
                     for mask in self.not_from_other_camera_masks)
                 self.query_comes_from_source[track_id] = not is_inside_excluded_area
 
-        non_overlapping_crops = []
-        non_overlapping_track_ids = []
-        self.query_camera_overlap_by_track_id = {}
+        query_crops = []
+        query_track_ids = []
 
         for track in tracks:
             track_id = int(track[4])
             if not self.query_comes_from_source[track_id]:
-                self.query_camera_overlap_by_track_id[track_id] = None
                 continue
 
             x1, y1, x2, y2 = map(int, track[:4])
-            is_overlapping = False #geometry_utils.is_box_overlapping(track, tracks, min_iou=0.1, box_id=track_id)
-            self.query_camera_overlap_by_track_id[track_id] = is_overlapping
-            if not is_overlapping:
-                non_overlapping_track_ids.append(track_id)
-                non_overlapping_crops.append(geometry_utils.get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8))
+            query_track_ids.append(track_id)
+            query_crops.append(geometry_utils.get_shrunk_crop(frame, x1, y1, x2, y2, scale=0.8))
 
         all_visible_query_embeddings = calculate_embedding_multiple(self.embedder,
-                                                                    non_overlapping_crops,
+                                                                    query_crops,
                                                                     distributed_count=None,
                                                                     return_mean=False)
         if all_visible_query_embeddings is None:
             return
 
         for index, vector in enumerate(all_visible_query_embeddings):
-            track_id = non_overlapping_track_ids[index]
+            track_id = query_track_ids[index]
             self.embedding_histories_query[track_id].append(vector)
 
     def query_camera_track_is_relevant(self, track_id):
@@ -122,10 +116,9 @@ class CrossCameraMatcher:
             self.embedding_of_exited_source[index] = self.embeddings_per_id[other_track_id]
             self.embedding_of_exited_source_map.append(other_track_id)
 
-    def check_matches(self, track_id, crossed_time, exited_times_source):
+    def check_matches(self, track_id, crossed_seconds, exited_seconds_source):
 
-        is_overlapping = self.query_camera_overlap_by_track_id.get(track_id)
-        if is_overlapping or not self.embedding_histories_query[track_id]:
+        if not self.embedding_histories_query[track_id]:
             return
 
         query_embedding = np.mean(self.embedding_histories_query[track_id], axis=0)
@@ -143,8 +136,8 @@ class CrossCameraMatcher:
             other_track_id = self.embedding_of_exited_source_map[closest_index]
             is_strong, other_draw_crop = self._best_crop_for_source_camera_track(other_track_id)
 
-            elapsed_ms = crossed_time - exited_times_source[other_track_id]
-            if elapsed_ms < 15.0:
+            elapsed_seconds = crossed_seconds - exited_seconds_source[other_track_id]
+            if elapsed_seconds < 15.0:
                 continue
 
             match_data = self.best_matches_query[track_id].get(other_track_id)
@@ -153,23 +146,23 @@ class CrossCameraMatcher:
                     "embedding_score": embedding_score,
                     "other_draw_crop": other_draw_crop,
                     "other_track_id": other_track_id,
-                    "elapsed_ms": elapsed_ms,
+                    "elapsed_seconds": elapsed_seconds,
                 }
                 self.best_matches_query[track_id][other_track_id] = match_data
             else:
                 match_data["embedding_score"] = embedding_score
-                match_data["elapsed_ms"] = elapsed_ms
+                match_data["elapsed_seconds"] = elapsed_seconds
 
             match_data["is_strong"] = is_strong
 
             if not is_strong:
                 match_data["embedding_score"] *= 1.1
 
-            elapsed_ms_score = 0.0 if match_data['elapsed_ms'] < 15.0 or match_data['elapsed_ms'] > 60.0 else 1.0
-            match_data["elapsed_ms_score"] = elapsed_ms_score
+            elapsed_seconds_score = 0.0 if match_data['elapsed_seconds'] < 15.0 or match_data['elapsed_seconds'] > 60.0 else 1.0
+            match_data["elapsed_seconds_score"] = elapsed_seconds_score
             if match_data["embedding_score"] < 0.35:
                 match_data["embedding_score"] = 0.0
-            match_data["global_score"] = match_data["embedding_score"] * match_data["elapsed_ms_score"]
+            match_data["global_score"] = match_data["embedding_score"] * match_data["elapsed_seconds_score"]
 
 
 
