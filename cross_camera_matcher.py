@@ -33,7 +33,7 @@ class CrossCameraMatcher:
         self.embedding_histories_query = defaultdict(list)
         self.embedding_of_exited_source_map = []
         self.embedding_of_exited_source = np.zeros(0)
-        self.query_comes_from_source = {}
+        self.query_track_is_candidate = {}
         self.best_matches_query = defaultdict(dict)
 
     def get_best_matches(self):
@@ -43,21 +43,16 @@ class CrossCameraMatcher:
 
     def process_query_embeddings(self, tracks, frame):
         for track in tracks:
-            x1, _, x2, y2 = map(int, track[:4])
             track_id = int(track[4])
-            if track_id not in self.query_comes_from_source:
-                bottom_center = (int((x1 + x2) / 2), y2)
-                is_inside_excluded_area = any(
-                    geometry_utils.point_inside_polygon(bottom_center, mask)
-                    for mask in self.not_from_other_camera_masks)
-                self.query_comes_from_source[track_id] = not is_inside_excluded_area
+            if not self.query_track_is_candidate.get(track_id, False):
+                self.query_track_is_candidate[track_id] = self._check_if_query_track_is_candidate(track)
 
         query_crops = []
         query_track_ids = []
 
         for track in tracks:
             track_id = int(track[4])
-            if not self.query_comes_from_source[track_id]:
+            if not self.query_track_is_candidate[track_id]:
                 continue
 
             x1, y1, x2, y2 = map(int, track[:4])
@@ -76,7 +71,15 @@ class CrossCameraMatcher:
             self.embedding_histories_query[track_id].append(vector)
 
     def query_camera_track_is_relevant(self, track_id):
-        return self.query_comes_from_source.get(track_id, True)
+        return self.query_track_is_candidate.get(track_id, True)
+
+    def _check_if_query_track_is_candidate(self, track):
+        x1, _, x2, y2 = map(int, track[:4])
+        bottom_center = (int((x1 + x2) / 2), y2)
+        is_inside_excluded_area = any(
+            geometry_utils.point_inside_polygon(bottom_center, mask)
+            for mask in self.not_from_other_camera_masks)
+        return not is_inside_excluded_area
 
     def append_source_camera_crop(self, track_id, crop, is_strong_crop):
         if is_strong_crop:
