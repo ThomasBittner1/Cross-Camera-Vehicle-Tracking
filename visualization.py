@@ -27,7 +27,7 @@ class Visualizer:
             self.source_crops_page += 1
 
     def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, query_best_matches,
-             cross_camera_matcher, exited_seconds_source):
+             cross_camera_matcher, source_exit_seconds):
         for camera_index in [0, 1]:
             draw_frame = original_frames[camera_index].copy()
             draw_data = frame_draw_data_by_camera[camera_index]
@@ -36,8 +36,8 @@ class Visualizer:
             self._draw_overlays(camera_index, draw_frame)
             if draw_data["line"] is not None:
                 cv2.line(draw_frame, draw_data["line"][0], draw_data["line"][1], (0, 0, 255), 2)
-            for exit_line in draw_data["disappear_lines"]:
-                cv2.line(draw_frame, exit_line[0], exit_line[1], (0, 255, 255), 2)
+            for discard_line in draw_data["discard_lines"]:
+                cv2.line(draw_frame, discard_line[0], discard_line[1], (0, 255, 255), 2)
 
             for box in draw_data["boxes"]:
                 if isolated_track_id is not None and box["track_id"] != isolated_track_id:
@@ -61,7 +61,7 @@ class Visualizer:
             self._draw_legend(draw_frame, draw_data["frame_text"], draw_data["fps_text"])
             cv2.imshow(self.config.window_names[camera_index], draw_frame)
 
-        self._draw_source_crops(cross_camera_matcher, exited_seconds_source)
+        self._draw_source_crops(cross_camera_matcher, source_exit_seconds)
 
     def _draw_overlays(self, camera_index, draw_frame):
         display = self.config.display
@@ -206,7 +206,7 @@ class Visualizer:
             2,
         )
 
-    def _draw_source_crops(self, cross_camera_matcher, exited_seconds_source):
+    def _draw_source_crops(self, cross_camera_matcher, source_exit_seconds):
         source_track_ids = sorted(
             set(cross_camera_matcher.strong_crops_per_ids_source.keys())
             | set(cross_camera_matcher.weak_crops_per_ids_source.keys()),
@@ -253,8 +253,8 @@ class Visualizer:
             weak_crops = cross_camera_matcher.weak_crops_per_ids_source.get(track_id, [])
 
             left_text = "active"
-            if track_id in exited_seconds_source:
-                left_text = f"left {exited_seconds_source[track_id]:.1f}s"
+            if track_id in source_exit_seconds:
+                left_text = f"left {source_exit_seconds[track_id]:.1f}s"
             cv2.putText(crops_frame, f"id {track_id}", (car_x, padding + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             cv2.putText(crops_frame, left_text, (car_x, padding + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
             cv2.putText(crops_frame, "strong", (car_x, padding + header_h + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)

@@ -93,10 +93,10 @@ def run(config=None):
     model = load_detection_model(config.model_path, confidence=0.02, iou=0.7, onnx_input_size=640)
 
     previous_centers_by_camera = [dict() for _ in config.video_paths]
-    disappeared_track_ids_source = set()
+    discarded_source_track_ids = set()
     source_track_last_seen_frame = {}
     registered_source_track_ids = set()
-    exited_seconds_source = {}
+    source_exit_seconds = {}
     crossed_seconds_query = {}
     pending_click_by_camera = [None for _ in config.window_names]
     isolated_track_id_by_camera = [None for _ in config.window_names]
@@ -147,27 +147,27 @@ def run(config=None):
             source_draw_data = {"boxes": [],
                                 "others": [],
                                 "line": None,
-                                "disappear_lines": config.disappear_lines_source,
+                                "discard_lines": config.source_discard_lines,
                                 "frame_text": f"Frame {current_frame_index}",
                                 "fps_text": f"FPS {measured_fps:.1f}"}
             for track in tracks_by_camera[0]:
                 track_id = int(track[4])
-                if track_id in disappeared_track_ids_source:
+                if track_id in discarded_source_track_ids:
                     continue
                 x1, y1, x2, y2 = map(int, track[:4])
                 previous_center = previous_centers_by_camera[0].get(track_id)
                 current_center = _track_center(track)
                 source_track_last_seen_frame[track_id] = current_frame_index
-                for disappear_line in config.disappear_lines_source:
-                    if _crossed_line(previous_center, current_center, disappear_line, directional=True):
-                        disappeared_track_ids_source.add(track_id)
+                for discard_line in config.source_discard_lines:
+                    if _crossed_line(previous_center, current_center, discard_line, directional=True):
+                        discarded_source_track_ids.add(track_id)
                         cross_camera_matcher.discard_source_camera_track(track_id)
                         source_track_last_seen_frame.pop(track_id, None)
                         registered_source_track_ids.discard(track_id)
-                        exited_seconds_source.pop(track_id, None)
+                        source_exit_seconds.pop(track_id, None)
                         previous_centers_by_camera[0].pop(track_id, None)
                         break
-                if track_id in disappeared_track_ids_source:
+                if track_id in discarded_source_track_ids:
                     continue
 
                 previous_centers_by_camera[0][track_id] = current_center
@@ -211,7 +211,7 @@ def run(config=None):
             query_draw_data = {"boxes": [],
                                "others": [],
                                "line": config.entry_line_query,
-                               "disappear_lines": [],
+                               "discard_lines": [],
                                "frame_text": f"Frame {current_frame_index}",
                                "fps_text": f"FPS {measured_fps:.1f}"}
             for track in tracks_by_camera[1]:
@@ -234,7 +234,7 @@ def run(config=None):
                     label = f"{label} crossed"
 
                 if track_id in crossed_seconds_query:
-                    cross_camera_matcher.check_matches(track_id, crossed_seconds_query[track_id], exited_seconds_source)
+                    cross_camera_matcher.check_matches(track_id, crossed_seconds_query[track_id], source_exit_seconds)
 
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
@@ -248,10 +248,10 @@ def run(config=None):
                 if track_id in current_source_track_ids or track_id in registered_source_track_ids:
                     continue
                 registered_source_track_ids.add(track_id)
-                if track_id in disappeared_track_ids_source:
+                if track_id in discarded_source_track_ids:
                     continue
 
-                exited_seconds_source[track_id] = last_seen_frame * frame_interval_seconds
+                source_exit_seconds[track_id] = last_seen_frame * frame_interval_seconds
                 cross_camera_matcher.record_embeddings(track_id)
                 source_gallery_changed = True
 
@@ -295,7 +295,7 @@ def run(config=None):
             isolated_track_id_by_camera,
             cross_camera_matcher.get_best_matches(),
             cross_camera_matcher,
-            exited_seconds_source,
+            source_exit_seconds,
         )
 
     for cap in captures:

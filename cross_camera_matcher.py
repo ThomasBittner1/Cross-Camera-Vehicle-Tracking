@@ -119,7 +119,7 @@ class CrossCameraMatcher:
             self.source_gallery_embeddings[index] = self.embeddings_per_id[source_track_id]
             self.source_gallery_track_ids.append(source_track_id)
 
-    def check_matches(self, track_id, crossed_seconds, exited_seconds_source):
+    def check_matches(self, track_id, crossed_seconds, source_exit_seconds):
 
         if not self.embedding_histories_query[track_id]:
             return
@@ -139,7 +139,7 @@ class CrossCameraMatcher:
             source_track_id = self.source_gallery_track_ids[closest_index]
             is_strong, source_draw_crop = self._best_crop_for_source_camera_track(source_track_id)
 
-            elapsed_seconds = crossed_seconds - exited_seconds_source[source_track_id]
+            elapsed_seconds = crossed_seconds - source_exit_seconds[source_track_id]
             if elapsed_seconds < 15.0:
                 continue
 
