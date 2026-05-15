@@ -203,10 +203,13 @@ class Visualizer:
     def _draw_source_crops(self, cross_camera_matcher, exited_times_source):
         source_track_ids = sorted(
             set(cross_camera_matcher.strong_crops_per_ids_source.keys())
-            | set(cross_camera_matcher.weak_crops_per_ids_source.keys())
+            | set(cross_camera_matcher.weak_crops_per_ids_source.keys()),
+            reverse=True,
         )
         if not source_track_ids:
             cv2.imshow("source crops", np.zeros((80, 300, 3), dtype=np.uint8))
+            cv2.destroyWindow("source crops")
+            cv2.namedWindow("source crops", cv2.WINDOW_AUTOSIZE)
             return
 
         thumb_w = 90
