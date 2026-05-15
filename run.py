@@ -119,6 +119,7 @@ def run(config=None):
 
     fps = captures[0].get(cv2.CAP_PROP_FPS) or 10.0
     frame_interval_seconds = 1.0 / fps
+    visualizer.set_recording_fps(fps)
     masks = _create_masks(captures, config.mask_points_by_camera)
     trackers = create_trackers_by_camera(config.model_path, camera_count)
 
@@ -322,6 +323,7 @@ def run(config=None):
 
     for cap in captures:
         cap.release()
+    visualizer.close()
     cv2.destroyAllWindows()
 
 

@@ -11,6 +11,8 @@ class Visualizer:
         self.show_not_from_other_camera_area = False
         self.source_crops_page = 0
         self.source_crops_cars_per_page = 6
+        self.recording_fps = 10.0
+        self.recording_writer = None
 
     def handle_key(self, key):
         if key in (ord("d"), ord("D")):
@@ -27,6 +29,9 @@ class Visualizer:
             self.source_crops_page = max(0, self.source_crops_page - 1)
         elif key == ord("."):
             self.source_crops_page += 1
+
+    def set_recording_fps(self, fps):
+        self.recording_fps = fps
 
     def draw(self, original_frames, frame_draw_data_by_camera, isolated_track_id_by_camera, query_best_matches,
              cross_camera_matcher, source_exit_seconds):
@@ -75,6 +80,8 @@ class Visualizer:
         if self.debug_mode:
             for camera_index, draw_frame in draw_frames_by_camera.items():
                 cv2.imshow(self.config.window_names[camera_index], draw_frame)
+            if 1 in draw_frames_by_camera:
+                self._record_query_frame(draw_frames_by_camera[1])
         elif 1 in draw_frames_by_camera:
             query_frame = draw_frames_by_camera[1]
             source_inset_height = 0
@@ -88,6 +95,7 @@ class Visualizer:
                 query_draw_data["fps_text"],
             )
             cv2.imshow(self.config.window_names[1], query_frame)
+            self._record_query_frame(query_frame)
 
         if self.debug_mode:
             self._draw_source_crops(cross_camera_matcher, source_exit_seconds)
@@ -117,6 +125,30 @@ class Visualizer:
             cv2.destroyWindow(self.config.window_names[0])
         except cv2.error:
             pass
+
+    def _record_query_frame(self, query_frame):
+        if self.config.record_to_file is None:
+            return
+
+        if self.recording_writer is None:
+            frame_h, frame_w = query_frame.shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            self.recording_writer = cv2.VideoWriter(
+                str(self.config.record_to_file),
+                fourcc,
+                self.recording_fps,
+                (frame_w, frame_h),
+            )
+            if not self.recording_writer.isOpened():
+                self.recording_writer = None
+                raise RuntimeError(f"Could not open recording file: {self.config.record_to_file}")
+
+        self.recording_writer.write(query_frame)
+
+    def close(self):
+        if self.recording_writer is not None:
+            self.recording_writer.release()
+            self.recording_writer = None
 
     def _draw_overlays(self, camera_index, draw_frame):
         if not self.debug_mode:
