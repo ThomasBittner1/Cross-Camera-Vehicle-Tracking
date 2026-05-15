@@ -250,6 +250,7 @@ def run(config=None):
                 query_draw_data["boxes"].append({"track_id": track_id,
                                                  "coords": (x1, y1, x2, y2),
                                                  "label": label,
+                                                 "has_crossed_entry_line": track_id in crossed_seconds_query,
                                                  "label_color": config.display_colors_by_camera[query_camera_index],
                                                  "box_color": config.display_colors_by_camera[query_camera_index]})
             frame_draw_data_by_camera[query_camera_index] = query_draw_data

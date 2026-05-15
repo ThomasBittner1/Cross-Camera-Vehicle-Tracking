@@ -3,9 +3,11 @@ from pathlib import Path
 
 class AppConfig:
     start_frame_index = 0
+    debug_mode = False
+    show_score_label = False
     debug_pause_at_frame_index = 1350
     model_path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train2\weights\best.engine")
-    window_names = ("c042", "c041")
+    window_names = ("source c042", "query c041")
     video_paths = (
         r"AICity22_Track1_MTMC_Tracking\test\S06\c042\vdo.avi",
         r"AICity22_Track1_MTMC_Tracking\test\S06\c041\vdo.avi",

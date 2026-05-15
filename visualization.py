@@ -6,17 +6,19 @@ class Visualizer:
     def __init__(self, config):
         self.config = config
         self.num_other_matches_to_show = 5
-        self.debug_matches = False
+        self.debug_mode = config.debug_mode
         self.show_inference_ignore_area = False
         self.show_not_from_other_camera_area = False
         self.source_crops_page = 0
         self.source_crops_cars_per_page = 6
 
     def handle_key(self, key):
-        if ord("0") <= key <= ord("9"):
+        if key in (ord("d"), ord("D")):
+            self.debug_mode = not self.debug_mode
+        elif not self.debug_mode:
+            return
+        elif ord("0") <= key <= ord("9"):
             self.num_other_matches_to_show = key - ord("0")
-        elif key in (ord("d"), ord("D")):
-            self.debug_matches = not self.debug_matches
         elif key in (ord("m"), ord("M")):
             self.show_inference_ignore_area = not self.show_inference_ignore_area
         elif key in (ord("o"), ord("O")):
@@ -49,25 +51,34 @@ class Visualizer:
 
                 x1, y1, x2, _ = box["coords"]
                 cv2.rectangle(draw_frame, (x1, y1), (x2, box["coords"][3]), box["box_color"], 2)
-                cv2.putText(
-                    draw_frame,
-                    box["label"],
-                    (x1, max(20, y1 - 5)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    box["label_color"],
-                    2,
-                )
+                if self.debug_mode:
+                    cv2.putText(
+                        draw_frame,
+                        box["label"],
+                        (x1, max(20, y1 - 5)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        box["label_color"],
+                        2,
+                    )
 
-                if camera_index == 1 and box["track_id"] in query_best_matches:
-                    self._draw_match_panel(draw_frame, box, query_best_matches[box["track_id"]])
+                if camera_index == 1:
+                    matches = query_best_matches.get(box["track_id"], [])
+                    if matches or box.get("has_crossed_entry_line", False):
+                        self._draw_match_panel(draw_frame, box, matches)
 
             self._draw_legend(draw_frame, draw_data["frame_text"], draw_data["fps_text"])
             cv2.imshow(self.config.window_names[camera_index], draw_frame)
 
-        self._draw_source_crops(cross_camera_matcher, source_exit_seconds)
+        if self.debug_mode:
+            self._draw_source_crops(cross_camera_matcher, source_exit_seconds)
+        else:
+            self._close_source_crops_window()
 
     def _draw_overlays(self, camera_index, draw_frame):
+        if not self.debug_mode:
+            return
+
         if self.show_inference_ignore_area:
             overlay = draw_frame.copy()
             cv2.fillPoly(
@@ -114,11 +125,16 @@ class Visualizer:
 
         for match_data in reversed(matches_to_draw):
             source_draw_crop = match_data["source_draw_crop"]
-            source_label = (
-                f"{match_data['source_track_id']} "
-                f"score: {match_data['embedding_score']:.2f} / {match_data['elapsed_seconds_score']:.1f} "
-                f"({match_data['elapsed_seconds']:.1f}s) / {match_data['global_score']:.2f}\n"
-                f"{'strong' if match_data['is_strong'] else 'weak'}")
+            if self.debug_mode:
+                source_label = (
+                    f"{match_data['source_track_id']} "
+                    f"score: {match_data['embedding_score']:.2f} / {match_data['elapsed_seconds_score']:.1f} "
+                    f"({match_data['elapsed_seconds']:.1f}s) / {match_data['global_score']:.2f}\n"
+                    f"{'strong' if match_data['is_strong'] else 'weak'}")
+            elif not self.config.show_score_label:
+                source_label = ""
+            else:
+                source_label = self._match_confidence_label(match_data["global_score"])
 
             crop_h, crop_w = source_draw_crop.shape[:2]
             box_w = max(1, x2 - x1)
@@ -132,6 +148,7 @@ class Visualizer:
                     "target_w": target_w,
                     "target_h": target_h,
                     "label": source_label,
+                    "label_color": (0, 255, 0) if not self.debug_mode else self.config.display_colors_by_camera[0],
                 }
             )
             panel_width = max(panel_width, target_w)
@@ -149,7 +166,8 @@ class Visualizer:
             panel_y1 = panel_y
             panel_y2 = panel_y + item["target_h"]
             panel[panel_y1:panel_y2, panel_x1:panel_width] = resized_crop
-            text_items.append({"label": item["label"], "x": panel_x1, "y": panel_y2 - 3})
+            if item["label"]:
+                text_items.append({"label": item["label"], "x": panel_x1, "y": panel_y2 - 3, "color": item["label_color"]})
             panel_y = panel_y2
 
         frame_h, frame_w = draw_frame.shape[:2]
@@ -178,12 +196,12 @@ class Visualizer:
                 (paste_x1 + max(0, text_x), paste_y1 + text_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
-                self.config.display_colors_by_camera[0],
+                text_item["color"],
                 2,
             )
 
     def _visible_matches(self, matches):
-        if self.debug_matches:
+        if self.debug_mode:
             return matches[0:self.num_other_matches_to_show]
 
         if matches and matches[0]["global_score"] > 0.0:
@@ -191,9 +209,19 @@ class Visualizer:
 
         return []
 
+    def _match_confidence_label(self, global_score):
+        score_percent = global_score * 100
+        if score_percent > 80:
+            return "Very likely"
+        if score_percent > 65:
+            return "Likely"
+        if score_percent > 50:
+            return "Possible"
+        return "Weak Match"
+
     def _draw_no_matches_found(self, draw_frame, box):
         x1, _, x2, y2 = box["coords"]
-        label = "no matches found"
+        label = "no source found"
         text_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         text_w, text_h = text_size
         frame_h, frame_w = draw_frame.shape[:2]
@@ -268,6 +296,12 @@ class Visualizer:
 
         cv2.imshow("source crops", crops_frame)
 
+    def _close_source_crops_window(self):
+        try:
+            cv2.destroyWindow("source crops")
+        except cv2.error:
+            pass
+
     def _draw_crop_column(self, frame, crops, x, y, thumb_w, thumb_h):
         for crop_index, crop in enumerate(crops):
             if crop.size == 0:
@@ -281,13 +315,14 @@ class Visualizer:
         legend_lines = [
             frame_text,
             fps_text,
-            (
-                f"D: debug matches ({'on' if self.debug_matches else 'off'})  "
+        ]
+        if self.debug_mode:
+            legend_lines.append(
+                f"D: debug mode (on)  "
                 f"0-9: matches ({self.num_other_matches_to_show})  "
                 f"M: inference-ignore ({'on' if self.show_inference_ignore_area else 'off'})  "
                 f"O: not-from-other-camera ({'on' if self.show_not_from_other_camera_area else 'off'})"
-            ),
-        ]
+            )
         for line_idx, legend_line in enumerate(legend_lines):
             y = 30 + line_idx * 28
             cv2.putText(draw_frame, legend_line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
