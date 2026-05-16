@@ -296,7 +296,7 @@ class Visualizer:
 
     def _draw_no_matches_found(self, draw_frame, box):
         x1, _, x2, y2 = box["coords"]
-        label = "no source found"
+        label = "unknown"
         text_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         text_w, text_h = text_size
         frame_h, frame_w = draw_frame.shape[:2]

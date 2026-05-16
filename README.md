@@ -12,20 +12,41 @@ query entry line.
 </video>
 
 
-## How to Run
+# Algorithm
 
-### Install Python packages:
+
+# Performance
+- A simple count showed 20 true positives and 6 false positives from frame 1000 to the end of the video.
+This is a relatively short evaluation range, and additional testing is required to make the algorithm more robust. However, the analysis was limited by the length of the video.
+- Speed: The speed most of the time varies between 8 FPS and 13 FPS. This is mostly acceptable since The camera's speed itself is 10 FPS. But it would result in skipping a few frames
+if this is evaluated in realtime. Potential fixes could be converting part of the matching from python to C++, or distributing the embeddings inference of the source camera better. 
+
+# Known Issues  
+- For vehicles not visible in the source camera, he typically does not classify them as unknown, when they appear in the query camera.
+There is an embedding-score threshold below which detections are classified as unknown. However, lowering this threshold too much would cause many valid matches to be discarded.
+
+# Difficulties
+
+
+# Ideas to improve
+- yolo has been optimized for those videos,  
+
+
+
+## Install
+
+#### 1. Install Python packages:
 
 ```powershell
 pip install -r requirements.txt
 ```
-Patch fix the boxmot package:
+#### 2. Patch fix the boxmot package:
 ``` powershell
 python _install_fix_boxmot.py
 ```
 
 
-### Download Embedding Model files:
+#### 3. Download Embedding Model files:
   - `net_19.pth`
   - `opts.yaml`  
 
@@ -33,13 +54,12 @@ https://drive.google.com/file/d/1STbsacssLtlHpUesNzuTeUPrfMlWbSKu/view
 (Source: https://github.com/regob/vehicle_mtmc)  
 After downloading the file, put *net_19.pth* and *opts.yaml* into the root folder.
 
-### Download input videos
+#### 4. Download input videos
 https://www.aicitychallenge.org/2022-track1-download
 Put the main folder *AICity22_Track1_MTMC_Tracking* into the root folder
 
 
-
-### Run
+## Run
 
 ```powershell
 python run.py
@@ -67,6 +87,7 @@ Debug-only controls:
 - Match panels include source ID, embedding score, elapsed seconds, and strong/weak crop status.
 
 ## Use of AI
+
 AI-assisted development tools (primarily Codex) were used throughout the project to accelerate implementation, 
 refactoring, and boilerplate generation.
 
