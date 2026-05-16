@@ -41,8 +41,9 @@ Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on
 
 # Debug Mode
 The debug mode displays both camera feeds separately. For the query camera, it shows the best source candidates, embedding scores, elapsed time, 
-and whether the selected source crop was classified as strong or weak.
-You can also click on individual vehicles to isolate and inspect their displays.
+and whether the selected source crop was classified as strong or weak.  
+You can also click on individual vehicles to isolate and inspect their displays.  
+With M and O you can display the masks for ignoring the YOLO inference (shown in red) and in the query camera the area that defines vehicles that didn't come from the source camera. 
 In addition, a separate window shows the current gallery of recorded crops from the source camera.![Alt text](debug_view.jpg)  
 
 
