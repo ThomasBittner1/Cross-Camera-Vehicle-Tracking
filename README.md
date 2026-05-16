@@ -42,14 +42,17 @@ Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on
 # Debug Mode
 The debug mode displays both camera feeds separately. For the query camera, it shows the best source candidates, embedding scores, elapsed time, 
 and whether the selected source crop was classified as strong or weak.  
+
 You can also click on individual vehicles to isolate and inspect their displays.  
 With M and O you can display the masks for ignoring the YOLO inference (shown in red) and in the query camera the area that defines vehicles that didn't come from the source camera. 
-In addition, a separate window shows the current gallery of recorded crops from the source camera.![Alt text](debug_view.jpg)  
+In addition, a separate window shows the current gallery of recorded crops from the source camera.  
+![Alt text](debug_view.jpg)  
 
 
 # Performance
-- A simple count resulted in **20 true positives** and **6 false positives** from frame 1000 to the end of the video.
-This is a relatively short evaluation range, and additional testing is required to make the algorithm more robust. However, the analysis was limited by the length of the video.
+- A simple manual count resulted in **20 true positives** and **6 false positives** from frame 1000 to the end of the video.
+This is a relatively short evaluation range, and additional testing is required to make the algorithm more robust. 
+However, the analysis was limited by the length of the video.
 - The speed usually varies between 8 FPS and 13 FPS. This is mostly acceptable because the input videos run at 10 FPS, but it can still skip frames during real-time use. Potential fixes include moving part of the matching code from Python to C++ or distributing source-camera embedding inference more efficiently.
 
 
@@ -67,6 +70,7 @@ There is an embedding-score threshold below which detections are classified as u
 - Tune the YOLO model 
 - Batch or parallelize embedding inference for better real-time performance.
 - Fine-tune embeddings model to get better embedding scores 
+- Distribute source-camera embedding inference more efficiently to get a better FPS rate
 
 
 ## Install
