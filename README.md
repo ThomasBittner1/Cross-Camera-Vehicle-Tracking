@@ -64,25 +64,24 @@ There is an embedding-score threshold below which detections are classified as u
 - YOLO was trained on images extracted from these videos. To improve its performance across a wider range of scenarios, additional training data is required.
 
 # Ideas to improve
-- Tune the YOLO model and masks for more camera pairs instead of only the current videos.
+- Tune the YOLO model 
 - Batch or parallelize embedding inference for better real-time performance.
 - Fine-tune embeddings model to get better embedding scores 
 
 
 ## Install
 
-#### 1. Install Python packages:
-
+**1. Install Python packages**
 ```powershell
 pip install -r requirements.txt
 ```
-#### 2. Patch fix the boxmot package:
+**2. Patch fix the boxmot package**  
 ``` powershell
 python _install_fix_boxmot.py
 ```
 
 
-#### 3. Download Embedding Model files:
+**3. Download Embedding Model files**  
   - `net_19.pth`
   - `opts.yaml`  
 
@@ -90,7 +89,7 @@ https://drive.google.com/file/d/1STbsacssLtlHpUesNzuTeUPrfMlWbSKu/view
 (Source: https://github.com/regob/vehicle_mtmc)  
 After downloading the file, put *net_19.pth* and *opts.yaml* into the root folder.
 
-#### 4. Download input videos
+**4. Download input videos**  
 https://www.aicitychallenge.org/2022-track1-download
 Put the main folder **AICity22_Track1_MTMC_Tracking** into the root folder of this project.
 
