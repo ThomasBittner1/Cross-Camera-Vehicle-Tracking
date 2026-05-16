@@ -1,36 +1,69 @@
 # Cars Multicamera Matching
 
-Re-Identifies vehicles in a traffic camera that came from another traffic camera.
+Re-Identifies vehicles in a traffic camera that were previously visible in another traffic camera.
 
 There's a **source** camera and a **query** camera. Cars that leave the source camera are recorded into a 
 temporary source gallery. Query-camera cars are compared against that gallery after crossing the 
-query entry line.
+query entry line (red line).
+The video shows the query camera, and the Source camera is shown in the yellow rectangle at the top left. 
 
-<video autoplay muted loop controls width="1280">
-    <source src="car_reid_compressed.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-</video>
+![Alt text](car_multicamera_short.gif)  
+Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on YouTube:
+
 
 
 # Algorithm
+
+1. **Detection and tracking**
+   - Each camera frame on both cameras is masked so YOLO only sees the relevant road area (in debug mode, click M to see the masks)
+   - A custom YOLO car detector runs on both cameras.
+   - BotSort keeps stable per-camera track IDs for detected vehicles.
+
+2. **Source-camera gallery creation**
+   - The source camera is treated as the camera where vehicles should appear first.
+   - While a source-camera track is visible, the system saves cropped vehicle images.
+   - Crops are marked as **strong** when the vehicle is large enough, not overlapping another car, and moving in the expected direction. Other usable crops are kept as weak fallback crops.
+   - If a source track crosses one of the configured discard lines (yellow lines), it is removed because it is moving toward an irrelevant exit.
+   - When a source track disappears, the saved crops are converted into vehicle ReID embeddings and averaged into one gallery embedding for that source track.
+   - Source records expire after `source_record_ttl_seconds` so old vehicles are not matched indefinitely.
+
+3. **Query-camera candidate filtering**
+   - Query-camera tracks are ignored if they appear in an area marked as not coming from the source camera (in debug mode, click O to see the mask)
+   - For each remaining query track, the system stores ReID embeddings from its visible crops over time.
+   - A query track becomes matchable after it crosses the configured query entry line.
+
+4. **Cross-camera matching**
+   - After a query track crosses the red entry line, its stored embeddings are averaged.
+   - The averaged query embedding is compared with the source gallery using cosine similarity.
+   - Matches are only considered if enough travel time has passed between the source track leaving and the query track crossing the entry line.
+   - Weak source crops are penalized, and matches below the embedding-score threshold are treated as no match.
+
+
+# Debug View
+The debug view shows both cameras separately. In the query camera it shows all the best source candidates, embedding score, elapsed time, and whether the selected source crop was strong or weak.
+It also displays a separe window that shows the current gallery of recorded source crops. 
+![Alt text](debug_view.jpg)  
 
 
 # Performance
 - A simple count showed 20 true positives and 6 false positives from frame 1000 to the end of the video.
 This is a relatively short evaluation range, and additional testing is required to make the algorithm more robust. However, the analysis was limited by the length of the video.
-- Speed: The speed most of the time varies between 8 FPS and 13 FPS. This is mostly acceptable since The camera's speed itself is 10 FPS. But it would result in skipping a few frames
-if this is evaluated in realtime. Potential fixes could be converting part of the matching from python to C++, or distributing the embeddings inference of the source camera better. 
+- The speed usually varies between 8 FPS and 13 FPS. This is mostly acceptable because the input videos run at 10 FPS, but it can still skip frames during real-time use. Potential fixes include moving part of the matching code from Python to C++ or distributing source-camera embedding inference more efficiently.
 
 # Known Issues  
-- For vehicles not visible in the source camera, he typically does not classify them as unknown, when they appear in the query camera.
-There is an embedding-score threshold below which detections are classified as unknown. However, lowering this threshold too much would cause many valid matches to be discarded.
+- Vehicles that were not visible in the source camera are often not classified as unknown when they appear in the query camera.
+There is an embedding-score threshold below which detections are classified as unknown. However, raising this threshold too much would cause many valid matches to be discarded.
 
 # Difficulties
+- Embeddings get very noisy, especially on cars that are recorded from a different angle 
+- Also Occlusions and overlapping vehicles can produce poor crops, so the source gallery needs to distinguish strong crops from weak fallback crops. 
+And it also amplifies embeddings from weak crops so they can compete with the strong crops. 
 
 
 # Ideas to improve
-- yolo has been optimized for those videos,  
-
+- Tune the YOLO model and masks for more camera pairs instead of only the current videos.
+- Batch or parallelize embedding inference for better real-time performance.
+- Fine-tune embeddings model to get better embedding scores 
 
 
 ## Install
