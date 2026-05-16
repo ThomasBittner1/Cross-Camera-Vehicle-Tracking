@@ -51,15 +51,16 @@ In addition, a separate window shows the current gallery of recorded crops from 
 This is a relatively short evaluation range, and additional testing is required to make the algorithm more robust. However, the analysis was limited by the length of the video.
 - The speed usually varies between 8 FPS and 13 FPS. This is mostly acceptable because the input videos run at 10 FPS, but it can still skip frames during real-time use. Potential fixes include moving part of the matching code from Python to C++ or distributing source-camera embedding inference more efficiently.
 
-# Known Issues  
-- Vehicles that were not visible in the source camera are often not classified as unknown when they appear in the query camera.
-There is an embedding-score threshold below which detections are classified as unknown. However, raising this threshold too much would cause many valid matches to be discarded.
 
 # Difficulties
 - Embeddings get very noisy, especially on cars that are recorded from a different angle 
 - Occlusions and overlapping vehicles can produce poor crops, so the source gallery needs to distinguish strong crops from weak fallback crops. 
 It also amplifies embeddings from weak crops so they can compete with the strong crops. 
 
+# Known Issues  
+- Vehicles that were not visible in the source camera are often not classified as unknown when they appear in the query camera.
+There is an embedding-score threshold below which detections are classified as unknown. However, raising this threshold too much would cause many valid matches to be discarded.
+- YOLO was trained on images extracted from these videos. To improve its performance across a wider range of scenarios, additional training data is required.
 
 # Ideas to improve
 - Tune the YOLO model and masks for more camera pairs instead of only the current videos.
