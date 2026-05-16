@@ -5,7 +5,7 @@ Re-Identifies vehicles in a traffic camera that were previously visible in anoth
 There's a **source** camera and a **query** camera. Cars that leave the source camera are recorded into a 
 temporary source gallery. Query-camera cars are compared against that gallery after crossing the 
 query entry line (red line).
-The video shows the query camera, and the Source camera is shown in the yellow rectangle at the top left. 
+The following videos show mainly query camera, source camera is shown in the yellow rectangle at the top left. 
 
 ![Alt text](car_multicamera_short.gif)  
 Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on YouTube:
@@ -39,14 +39,15 @@ Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on
    - Weak source crops are penalized, and matches below the embedding-score threshold are treated as no match.
 
 
-# Debug View
-The debug view shows both cameras separately. In the query camera it shows all the best source candidates, embedding score, elapsed time, and whether the selected source crop was strong or weak.
-It also displays a separe window that shows the current gallery of recorded source crops. 
-![Alt text](debug_view.jpg)  
+# Debug Mode
+The debug mode displays both camera feeds separately. For the query camera, it shows the best source candidates, embedding scores, elapsed time, 
+and whether the selected source crop was classified as strong or weak.
+You can also click on individual vehicles to isolate and inspect their displays.
+In addition, a separate window shows the current gallery of recorded crops from the source camera.![Alt text](debug_view.jpg)  
 
 
 # Performance
-- A simple count showed 20 true positives and 6 false positives from frame 1000 to the end of the video.
+- A simple count resulted in **20 true positives** and **6 false positives** from frame 1000 to the end of the video.
 This is a relatively short evaluation range, and additional testing is required to make the algorithm more robust. However, the analysis was limited by the length of the video.
 - The speed usually varies between 8 FPS and 13 FPS. This is mostly acceptable because the input videos run at 10 FPS, but it can still skip frames during real-time use. Potential fixes include moving part of the matching code from Python to C++ or distributing source-camera embedding inference more efficiently.
 
@@ -56,8 +57,8 @@ There is an embedding-score threshold below which detections are classified as u
 
 # Difficulties
 - Embeddings get very noisy, especially on cars that are recorded from a different angle 
-- Also Occlusions and overlapping vehicles can produce poor crops, so the source gallery needs to distinguish strong crops from weak fallback crops. 
-And it also amplifies embeddings from weak crops so they can compete with the strong crops. 
+- Occlusions and overlapping vehicles can produce poor crops, so the source gallery needs to distinguish strong crops from weak fallback crops. 
+It also amplifies embeddings from weak crops so they can compete with the strong crops. 
 
 
 # Ideas to improve
@@ -89,7 +90,7 @@ After downloading the file, put *net_19.pth* and *opts.yaml* into the root folde
 
 #### 4. Download input videos
 https://www.aicitychallenge.org/2022-track1-download
-Put the main folder *AICity22_Track1_MTMC_Tracking* into the root folder
+Put the main folder **AICity22_Track1_MTMC_Tracking** into the root folder of this project.
 
 
 ## Run
