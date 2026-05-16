@@ -114,12 +114,6 @@ Debug-only controls:
 - `O`: toggle query not-from-source mask overlay
 - `,` / `.`: page through source crop gallery
 
-## Debug Mode
-
-- Source and query cameras are shown in separate windows.
-- Source crop gallery is shown.
-- Tracker IDs and crop quality labels are visible.
-- Match panels include source ID, embedding score, elapsed seconds, and strong/weak crop status.
 
 ## Use of AI
 
