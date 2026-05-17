@@ -6,7 +6,7 @@ class AppConfig:
     debug_mode = False
     show_frame_info = True
     source_record_ttl_seconds = 60.0
-    record_to_file = None #"longer_video.mp4"
+    record_to_file = None
     debug_pause_at_frame_index = None
     model_path = Path(r"C:\ComputerVision\_Datasets_\tb_dataManager\runs_cars_multicamera\train2\weights\best.engine")
     window_names = ("source c042", "query c041")
