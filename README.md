@@ -53,7 +53,10 @@ In addition, a separate window shows the current gallery of recorded crops from 
 - A simple manual count resulted in **20 true positives** and **6 false positives** from frame 1000 to the end of the video.
 This is a relatively short evaluation range, and additional testing is required to make the algorithm more robust. 
 However, the analysis was limited by the length of the video.
-- The speed usually varies between 8 FPS and 13 FPS. This is mostly acceptable because the input videos run at 10 FPS, but it can still skip frames during real-time use. Potential fixes include moving part of the matching code from Python to C++ or distributing source-camera embedding inference more efficiently.
+- The speed usually varies between 8 FPS and 13 FPS using a GeForce RTX 4090. 
+This is mostly acceptable because the input videos run at 10 FPS, but it can still skip frames during real-time use. 
+Potential fixes include converting part of the matching code from Python to C++ or distributing source-camera 
+embedding inference more efficiently over frames.
 
 
 # Difficulties

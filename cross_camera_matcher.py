@@ -35,11 +35,21 @@ class CrossCameraMatcher:
         self.source_gallery_embeddings = np.zeros(0)
         self.query_track_is_candidate = {}
         self.best_matches_query = defaultdict(dict)
+        self.chosen_matches_query = {}
 
     def get_best_matches(self):
-        return {track_id: sorted(matches_by_source_id.values(), key=lambda match: match["global_score"], reverse=True)
-                for track_id, matches_by_source_id in self.best_matches_query.items() if matches_by_source_id}
+        return {
+            track_id: sorted(matches_by_source_id.values(), key=lambda match: match["global_score"], reverse=True)
+            for track_id, matches_by_source_id in self.best_matches_query.items()
+            if matches_by_source_id
+        }
 
+    def get_chosen_matches(self):
+        return {
+            track_id: [match_data]
+            for track_id, match_data in self.chosen_matches_query.items()
+            if match_data["global_score"] > 0.0
+        }
 
     def process_query_embeddings(self, tracks, frame):
         for track in tracks:
@@ -186,7 +196,30 @@ class CrossCameraMatcher:
                 match_data["embedding_score"] = 0.0
             match_data["global_score"] = match_data["embedding_score"]
 
+        self._update_chosen_match(track_id)
 
+
+    def _update_chosen_match(self, track_id):
+        matches_by_source_id = self.best_matches_query.get(track_id)
+        if not matches_by_source_id:
+            self.chosen_matches_query.pop(track_id, None)
+            return
+
+        sorted_matches = sorted(
+            matches_by_source_id.values(),
+            key=lambda match: match["global_score"],
+            reverse=True,
+        )
+        strongest_match = sorted_matches[0]
+        if strongest_match["global_score"] <= 0.0:
+            return
+
+        current_match = self.chosen_matches_query.get(track_id)
+        if (
+            current_match is None
+            or strongest_match["global_score"] > current_match["global_score"]
+        ):
+            self.chosen_matches_query[track_id] = dict(strongest_match)
 
     def _best_crop_for_source_camera_track(self, track_id):
         strong_crops = self.strong_crops_per_ids_source.get(track_id, [])

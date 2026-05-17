@@ -312,11 +312,17 @@ def run(config=None):
             last_processed_frame_time = now
             current_frame_index += 1
 
+        query_best_matches = (
+            cross_camera_matcher.get_best_matches()
+            if visualizer.debug_mode
+            else cross_camera_matcher.get_chosen_matches()
+        )
+
         visualizer.draw(
             original_frames,
             frame_draw_data_by_camera,
             isolated_track_id_by_camera,
-            cross_camera_matcher.get_best_matches(),
+            query_best_matches,
             cross_camera_matcher,
             source_exit_seconds,
         )
