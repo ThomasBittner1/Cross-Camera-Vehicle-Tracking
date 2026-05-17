@@ -385,10 +385,14 @@ class Visualizer:
             frame[crop_y:crop_y + thumb_h, x:x + thumb_w] = resized_crop
 
     def _draw_legend(self, draw_frame, frame_text, fps_text):
-        legend_lines = [
-            frame_text,
-            fps_text,
-        ]
+        legend_lines = []
+        if self.config.show_frame_info:
+            legend_lines.extend(
+                [
+                    frame_text,
+                    fps_text,
+                ]
+            )
         if self.debug_mode:
             legend_lines.append(
                 f"D: debug-mode (on)  "

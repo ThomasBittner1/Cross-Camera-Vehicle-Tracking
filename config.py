@@ -4,6 +4,7 @@ from pathlib import Path
 class AppConfig:
     start_frame_index = 0
     debug_mode = False
+    show_frame_info = True
     show_score_label = True
     source_record_ttl_seconds = 60.0
     record_to_file = None # "recording_0.mp4"
