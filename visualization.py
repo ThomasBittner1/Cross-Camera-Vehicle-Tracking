@@ -47,7 +47,7 @@ class Visualizer:
 
             self._draw_overlays(camera_index, draw_frame)
             if draw_data["line"] is not None:
-                cv2.line(draw_frame, draw_data["line"][0], draw_data["line"][1], (0, 0, 255), 2)
+                cv2.line(draw_frame, draw_data["line"][0], draw_data["line"][1], (255, 255, 0), 2)
             for discard_line in draw_data["discard_lines"]:
                 cv2.line(draw_frame, discard_line[0], discard_line[1], (0, 255, 255), 2)
 
@@ -202,9 +202,9 @@ class Visualizer:
             source_draw_crop = match_data["source_draw_crop"]
             if self.debug_mode:
                 source_label = (
-                    f"{match_data['source_track_id']} "
-                    f"score: {match_data['embedding_score']:.2f} "
-                    f"({match_data['elapsed_seconds']:.1f}s)\n"
+                    f"{match_data['source_track_id']} | "
+                    f"score: {match_data['embedding_score']:.2f} | "
+                    f"{match_data['elapsed_seconds']:.1f}s | "
                     f"{'strong' if match_data['is_strong'] else 'weak'}")
             elif not self.config.show_score_label:
                 source_label = ""
@@ -290,9 +290,7 @@ class Visualizer:
             return "Very likely"
         if score_percent > 65:
             return "Likely"
-        if score_percent > 50:
-            return "Possible"
-        return "Weak Match"
+        return "Possible"
 
     def _draw_no_matches_found(self, draw_frame, box):
         x1, _, x2, y2 = box["coords"]
@@ -393,10 +391,10 @@ class Visualizer:
         ]
         if self.debug_mode:
             legend_lines.append(
-                f"D: debug mode (on)  "
+                f"D: debug-mode (on)  "
                 f"0-9: matches ({self.num_other_matches_to_show})  "
                 f"M: inference-ignore ({'on' if self.show_inference_ignore_area else 'off'})  "
-                f"O: not-from-other-camera ({'on' if self.show_not_from_other_camera_area else 'off'})"
+                f"O: not-from-source-camera ({'on' if self.show_not_from_other_camera_area else 'off'})"
             )
         for line_idx, legend_line in enumerate(legend_lines):
             text_size, _ = cv2.getTextSize(legend_line, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
