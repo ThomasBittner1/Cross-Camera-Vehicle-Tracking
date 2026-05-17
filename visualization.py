@@ -206,8 +206,6 @@ class Visualizer:
                     f"score: {match_data['embedding_score']:.2f} | "
                     f"{match_data['elapsed_seconds']:.1f}s | "
                     f"{'strong' if match_data['is_strong'] else 'weak'}")
-            elif not self.config.show_score_label:
-                source_label = ""
             else:
                 source_label = self._match_confidence_label(match_data["global_score"])
 

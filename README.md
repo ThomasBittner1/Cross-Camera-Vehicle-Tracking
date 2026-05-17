@@ -8,7 +8,7 @@ query entry line (red line).
 The following videos show mainly query camera, source camera is shown in the yellow rectangle at the top left. 
 
 ![Alt text](car_multicamera_short.gif)  
-Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on YouTube:
+Click [here](https://youtu.be/3h7nIVx7mr8) to see a longer and larger version on YouTube:
 
 
 
