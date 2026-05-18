@@ -69,6 +69,13 @@ It also amplifies embeddings from weak crops so they can compete with the strong
 There is an embedding-score threshold below which detections are classified as unknown. However, raising this threshold too much would cause many valid matches to be discarded.
 - YOLO was trained on images extracted from these videos. To improve its performance across a wider range of scenarios, additional training data is required.
 
+# Yolo
+For creating the model, Ultralytics and Label-Studio was used. For a better data-handling (pre-train, quality check, etc),
+I created a separate tool:  
+https://github.com/ThomasBittner1/DataManager
+
+
+
 # Ideas to improve
 - Tune the YOLO model 
 - Batch or parallelize embedding inference for better real-time performance.
