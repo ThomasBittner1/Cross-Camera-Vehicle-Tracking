@@ -69,11 +69,12 @@ It also amplifies embeddings from weak crops so they can compete with the strong
 There is an embedding-score threshold below which detections are classified as unknown. However, raising this threshold too much would cause many valid matches to be discarded.
 - YOLO was trained on images extracted from these videos. To improve its performance across a wider range of scenarios, additional training data is required.
 
-# Yolo
-For creating the model, Ultralytics and Label-Studio was used. For a better data-handling (pre-train, quality check, etc),
-I created a separate tool:  
-https://github.com/ThomasBittner1/DataManager
+# YOLO
 
+The models were created using *Ultralytics* and *Label-Studio*. To make data handling easier, I created this tool that handles things
+like quality checking pre-training, and splitting labels:
+https://github.com/ThomasBittner1/DataManager
+![Alt text](DataManager.png)  
 
 
 # Ideas to improve
@@ -93,9 +94,18 @@ pip install -r requirements.txt
 ``` powershell
 python _install_fix_boxmot.py
 ```
+**3. Download YOLO models**  
+https://www.dropbox.com/scl/fo/rxtyo6lqxiuo7ieuffhku/APcf0Gdwyqdk3PpRkojlJ0U?rlkey=ahfdtwtvlshzq435nqdm4u3ri&dl=0  
+Put the three files into the root folder. 
+By default it's choosing the tensorRT one (*cars_1.engine*), but you can switch to a different one in the *AppConfig*:
+
+``` python
+model_path = Path("cars_1.engine")
+```
+For the best performance, it is recommended to use the original model (*cars.pt*) and export it to TensorRT directly on your target system.
 
 
-**3. Download Embedding Model files**  
+**4. Download Embedding Model files**   
   - `net_19.pth`
   - `opts.yaml`  
 
